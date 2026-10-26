@@ -438,57 +438,104 @@ function renderRight(p) {
   const t = target;
   const targetText = !t ? 'Nothing selected'
     : t.level === 'element' ? 'data-el: ' + t.elementId
-    : t.level === 'screen' ? 'Screen: ' + t.screenName
-    : 'Whole prototype';
+    : 'Screen: ' + t.screenName;
   const list = p.comments.length
     ? p.comments.map((c, i) => `<div class="c"><button data-remove="${i}">×</button>
-        <div class="where">${esc(c.level)} · ${esc(c.screenName || 'whole prototype')}${c.elementId ? ' · ' + esc(c.elementId) : ''}</div>${esc(c.comment)}</div>`).join('')
-    : '<div class="chip">No comments yet</div>';
-  const canSynth = p.directions.length > 0 && !busy[p.id];
-  const label = p.prototype ? 'Synthesize changes' : (p.included.length > 1 ? 'Synthesize ' + p.included.length + ' directions' : 'Synthesize');
+        <div class="where">${esc(c.screenName || '')}${c.elementId ? ' · data-el ' + esc(c.elementId) : ''}</div>${esc(c.comment)}</div>`).join('')
+    : '<div class="chip">Click a screen or element, then write what should change.</div>';
+  const history = (p.versions || []).map((v, i) => `<div class="c">
+      <div class="where">${esc(new Date(v.at).toLocaleTimeString())} · ${esc(v.label)}</div>
+      ${i === 0 ? '<span class="chip">current</span>' : `<button data-restore="${i}">Restore</button>`}</div>`).join('');
+  const multi = !p.prototype && p.included.length > 1;
+  const canSynth = p.directions.length > 0 && !busy[p.id] && (p.prototype ? p.comments.length > 0 : true);
+  const label = multi ? 'Combine ' + p.included.length + ' directions (regenerates)'
+    : !p.prototype ? 'Start prototype from lead'
+    : p.comments.length ? 'Apply ' + p.comments.length + ' change' + (p.comments.length > 1 ? 's' : '')
+    : 'Comment to change a screen';
   $('right').innerHTML = `
     <h4>Comments</h4>
     <div class="target-row"><span>Lead direction</span><span class="chip"><b>${esc(p.directions[p.lead]?.name || '—')}</b></span></div>
     <div class="target-row"><span>Target</span><span class="chip">${esc(targetText)}</span></div>
-    <textarea class="ask" id="ask" placeholder="Ask for changes"></textarea>
+    <textarea class="ask" id="ask" placeholder="What should change here?"></textarea>
     <div style="display:flex;gap:6px"><button id="addC" style="flex:1">Add comment</button>
-      ${t ? '<button id="clearT">Clear target</button>' : ''}</div>
+      ${t ? '<button id="clearT">Clear</button>' : ''}</div>
     <div class="comments">${list}</div>
-    <button class="dark go" id="synth" ${canSynth ? '' : 'disabled'}>${label}</button>`;
+    <button class="dark go" id="synth" ${canSynth ? '' : 'disabled'}>${label}</button>
+    <h4 style="margin-top:8px">History</h4>
+    <div class="comments" style="flex:0 0 auto;max-height:220px">${history || '<div class="chip">No versions yet</div>'}</div>`;
   $('addC').onclick = () => {
     const text = $('ask').value.trim();
     if (!text) return;
-    p.comments.push({ ...(target || { level: 'prototype', screenName: '' }), comment: text });
+    if (!target) { status('Click a screen or element first.', true); return; }
+    p.comments.push({ ...target, comment: text });
     target = null; $('ask').value = ''; save(); render();
   };
   if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
   $('right').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { p.comments.splice(Number(b.dataset.remove), 1); save(); render(); });
+  $('right').querySelectorAll('[data-restore]').forEach(b => b.onclick = () => restoreVersion(p, Number(b.dataset.restore)));
   $('synth').onclick = () => synthesize(p);
 }
 
-// Build (no prototype yet) or iterate (prototype exists), using the comments.
+// Every change is recorded, newest first, so any version can be restored.
+function recordVersion(p, label) {
+  p.versions = [{ at: new Date().toISOString(), label, screens: p.prototype.screens }, ...(p.versions || [])].slice(0, 50);
+}
+
+function restoreVersion(p, i) {
+  const v = p.versions[i];
+  if (!v) return;
+  p.prototype = { name: 'Prototype', screens: JSON.parse(JSON.stringify(v.screens)) };
+  recordVersion(p, 'Restored: ' + v.label);
+  p.comments = []; target = null; shown.index = 0; save(); status('Restored an earlier version'); render();
+}
+
 async function synthesize(p) {
-  const pageComments = p.comments.filter(c => c.level === 'prototype').map(c => c.comment).join('\n');
-  const screenComments = p.comments.filter(c => c.level !== 'prototype').map(c => ({
+  // Each comment names one screen (and optionally one element). Nothing else is sent, so only those change.
+  const screenComments = p.comments.map(c => ({
     directionName: c.directionName || '', screenName: c.screenName || '',
     elementId: c.elementId || '', elementTag: c.elementTag || 'div', elementText: c.elementText || '',
     elementClasses: [], comment: c.comment,
   }));
-  const common = { ...p.brief, screenComments, generalComment: pageComments };
-  let payload;
-  if (p.prototype) {
-    payload = { mode: 'iterate', ...common, direction: p.prototype };
-  } else {
-    const picked = p.included.length ? p.included.map(i => p.directions[i]) : [p.directions[p.lead]];
-    payload = { mode: 'build', ...common, selectedDirections: picked };
+
+  // Combining several directions is the only path that regenerates screens. Ask first.
+  if (!p.prototype && p.included.length > 1) {
+    if (!confirm('Combining directions regenerates the screens with the model. Continue?')) return;
+    busy[p.id] = true; render();
+    const picked = p.included.map(i => p.directions[i]);
+    const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments, generalComment: '' },
+      'Combining directions');
+    busy[p.id] = false;
+    if (!data) { render(); return; }
+    p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
+    p.versions = [];
+    recordVersion(p, 'Combined ' + picked.length + ' directions');
+    p.comments = []; target = null; shown.index = 0; save(); status('Prototype ready'); render();
+    return;
   }
+
+  // First use: start from the lead direction exactly as it was generated. No model call.
+  if (!p.prototype) {
+    const lead = p.directions[p.lead];
+    if (!lead) return;
+    p.prototype = { name: 'Prototype', screens: lead.screens || [] };
+    p.versions = [];
+    recordVersion(p, 'From ' + (lead.name || 'lead direction'));
+    shown.index = 0;
+  }
+
+  if (!screenComments.length) {
+    save(); status('Prototype ready. Comment on a screen or element to change it.'); render();
+    return;
+  }
+
   busy[p.id] = true; render();
-  const data = await call(payload, p.prototype ? 'Applying changes' : 'Building prototype');
+  const data = await call({ mode: 'iterate', ...p.brief, direction: p.prototype, screenComments }, 'Applying changes');
   busy[p.id] = false;
   if (!data) { render(); return; }
   p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
-  p.comments = []; target = null; shown.index = 0; shown.tab = 'prototype';
-  save(); status(p.prototype.screens.length ? 'Prototype ready' : 'No screens returned'); render();
+  recordVersion(p, screenComments.length + ' change' + (screenComments.length > 1 ? 's' : ''));
+  p.comments = []; target = null;
+  save(); status('Changes applied'); render();
 }
 
 load();
