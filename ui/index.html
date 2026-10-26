@@ -451,6 +451,11 @@ function renderCenter(p) {
   if (!p.directions.length) {
     // Skeleton until the directions copy arrives.
     body = [0, 1, 2].map(() => skeletonDirection(dev)).join('');
+  } else if (shown.tab === 'screens' && busy[p.id] && !p.prototype) {
+    // Synthesis in progress: show the flow being built, not the direction being viewed.
+    const lead = p.directions[p.lead];
+    body = `<div class="dirhead"><h3>Synthesizing ${esc(lead?.name || '')}</h3><p>Building one flow from the lead and the comments on every direction.</p></div>
+      <div class="screen-row">${[0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('')}</div>`;
   } else if (shown.tab === 'screens') {
     const src = sourceScreens(p);
     const head = p.prototype
@@ -669,7 +674,7 @@ async function synthesize(p) {
     p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
     p.versions = [];
     recordVersion(p, 'Built from ' + picked.length + ' direction' + (picked.length > 1 ? 's' : ''));
-    p.comments = []; target = null; shown = { ...shown, index: 0, tab: 'prototype' };
+    p.comments = []; target = null; shown = { ...shown, index: 0, tab: 'screens', dir: null };
     save(); status('Prototype ready'); render();
     return;
   }
@@ -682,7 +687,7 @@ async function synthesize(p) {
   if (!data) { render(); return; }
   p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
   recordVersion(p, p.comments.length + ' change' + (p.comments.length > 1 ? 's' : ''));
-  p.comments = []; target = null;
+  p.comments = []; target = null; shown = { ...shown, tab: 'screens' };
   save(); status('Changes applied'); render();
 }
 
