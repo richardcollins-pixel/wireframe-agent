@@ -98,6 +98,7 @@
   <button id="back" style="display:none">←</button>
   <div class="brand">tds <span>Proto</span>Studio</div>
   <div class="status" id="status"></div>
+  <button id="settingsBtn">Settings</button>
   <button class="dark" id="newBtn">New Prototype</button>
 </div>
 
@@ -107,6 +108,18 @@
   <section class="left" id="left"></section>
   <section class="center" id="center"></section>
   <section class="right" id="right"></section>
+</div>
+
+<div class="scrim" id="setScrim">
+  <div class="modal">
+    <h2>Settings <button id="setClose">×</button></h2>
+    <label for="setUrl">Pipedream trigger URL</label>
+    <input id="setUrl" placeholder="https://….m.pipedream.net">
+    <label for="setToken">Token (only if the trigger requires one)</label>
+    <input id="setToken" type="password" placeholder="Optional">
+    <div class="foot"><button class="dark" id="setSave">Save</button></div>
+    <div class="err">Saved in this browser only. Nothing is stored in the repo.</div>
+  </div>
 </div>
 
 <div class="scrim" id="scrim">
@@ -187,24 +200,79 @@ $('mGo').onclick = async () => {
 };
 
 // ── api ──────────────────────────────────────────────────────────────────────
+// The page calls the Pipedream trigger directly, the same way the design-system editor calls
+// GitHub. The trigger URL and token are kept in this browser only (localStorage).
+const SETTINGS_KEY = 'tds-protostudio-settings';
+const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'persona', 'selectedDirections', 'direction', 'screenComments', 'generalComment'];
+const TDS_CSS = 'https://richardcollins-pixel.github.io/thoughtful-design-system/tds/tds.css';
+
+function settings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (_) { return {}; } }
+
+// Flow output is either flat (directions) or wrapped as {output: {screens}} (build, iterate).
+function normalize(result) {
+  if (result && result.output && typeof result.output === 'object') {
+    return { ...result.output, mode: result.mode, featureTitle: result.featureTitle };
+  }
+  return result;
+}
+
+async function post(url, token, agentInput) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ agentInput }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error('Pipedream returned ' + res.status);
+  return { status: res.status, data };
+}
+
 let timer = null;
 async function call(payload, label) {
+  const s = settings();
+  if (!s.triggerUrl) { openSettings(); status('Add the trigger URL in Settings first.', true); return null; }
   const started = Date.now();
   clearInterval(timer);
   const tick = () => status(label + ' · ' + Math.floor((Date.now() - started) / 1000) + 's');
   tick(); timer = setInterval(tick, 1000);
   try {
-    const res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    const data = await res.json();
+    const agentInput = {};
+    FLOW_FIELDS.forEach(k => { if (k in payload) agentInput[k] = payload[k]; });
+    const first = await post(s.triggerUrl, s.token, agentInput);
+    let result = first.data;
+    if (first.status === 202 && first.data.jobId) {
+      // Directions, build and iterate return a job id; poll the flow's get-job mode until it finishes.
+      const deadline = Date.now() + 7 * 60 * 1000;
+      result = null;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 3000));
+        const poll = await post(s.triggerUrl, s.token, { mode: 'get-job', jobId: first.data.jobId });
+        if (poll.data.status === 'complete') { result = poll.data.result || poll.data; break; }
+        if (poll.data.status === 'error') throw new Error(poll.data.error || 'job failed');
+      }
+      if (!result) throw new Error('job did not finish in 7 minutes');
+    }
     clearInterval(timer);
-    if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
-    return data;
+    return normalize(result);
   } catch (e) {
     clearInterval(timer);
     status('Failed: ' + e.message, true);
     return null;
   }
 }
+
+// ── settings ─────────────────────────────────────────────────────────────────
+function openSettings() {
+  const s = settings();
+  $('setUrl').value = s.triggerUrl || '';
+  $('setToken').value = s.token || '';
+  $('setScrim').classList.add('open');
+}
+$('settingsBtn').onclick = openSettings;
+$('setClose').onclick = () => $('setScrim').classList.remove('open');
+$('setSave').onclick = () => {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ triggerUrl: $('setUrl').value.trim(), token: $('setToken').value.trim() }));
+  $('setScrim').classList.remove('open');
+  status('Settings saved');
+};
 
 // ── workspace ────────────────────────────────────────────────────────────────
 function openProto(id) {
@@ -307,7 +375,7 @@ function frame(screen, device, scale) {
 // handler to them; if a screen is only a fragment, wrap it in a page first.
 function srcdoc(screen) {
   const head = `<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/tds/tds.css">
+<link rel="stylesheet" href="${TDS_CSS}">
 <style>
   html,body{margin:0;min-height:100%}
   [data-el]{cursor:pointer}
