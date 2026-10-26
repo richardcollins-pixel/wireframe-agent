@@ -96,7 +96,11 @@
 
 <div class="top">
   <button id="back" style="display:none">←</button>
-  <div class="brand">tds <span>Proto</span>Studio</div>
+  <div class="brand" id="brand">tds <span>Proto</span>Studio</div>
+  <div id="projectBar" style="display:none;align-items:center;gap:8px">
+    <input id="projName" style="width:320px;font-weight:600" aria-label="Project name">
+    <button id="projDelete">Delete project</button>
+  </div>
   <div class="status" id="status"></div>
   <button id="settingsBtn">Settings</button>
   <button class="dark" id="newBtn">New Prototype</button>
@@ -164,6 +168,8 @@ function renderLibrary() {
   $('ws').style.display = 'none';
   $('library').style.display = 'grid';
   $('back').style.display = 'none';
+  $('projectBar').style.display = 'none';
+  $('brand').style.display = '';
   const cards = db.prototypes.map(p => `
     <div class="card" data-open="${p.id}">
       <div class="thumb ${p.directions.length ? '' : 'blank'}">${p.directions.length ? '' : ''}</div>
@@ -306,6 +312,11 @@ function render() {
   $('ws').style.display = 'grid';
   $('back').style.display = '';
   $('back').onclick = () => { current = null; target = null; render(); };
+  $('brand').style.display = 'none';
+  $('projectBar').style.display = 'flex';
+  $('projName').value = p.title || '';
+  $('projName').onchange = () => { p.title = $('projName').value.trim() || 'Untitled prototype'; save(); };
+  $('projDelete').onclick = () => deleteProto(p);
   // Stage one: directions on the left. Once there is a prototype, the left shows its history instead.
   if (p.prototype) renderHistory(p); else renderLeft(p);
   renderCenter(p);
@@ -482,6 +493,14 @@ function renderRight(p) {
   if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
   $('right').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { p.comments.splice(Number(b.dataset.remove), 1); save(); render(); });
   $('synth').onclick = () => synthesize(p);
+}
+
+function deleteProto(p) {
+  if (busy[p.id]) { status('Wait for the current generation to finish, then delete.', true); return; }
+  if (!confirm('Delete "' + (p.title || 'Untitled prototype') + '"? This cannot be undone.')) return;
+  db.prototypes = db.prototypes.filter(x => x.id !== p.id);
+  current = null; target = null;
+  save(); status('Project deleted'); render();
 }
 
 // Every change is recorded, newest first, so any version can be restored.
