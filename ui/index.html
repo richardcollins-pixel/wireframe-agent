@@ -232,6 +232,24 @@ $('mGo').onclick = async () => {
   render();
 };
 
+// At most this many screen requests run at once, so Pipedream isn't flooded with simultaneous runs.
+const MAX_SCREENS_AT_ONCE = 4;
+let screensRunning = 0;
+const screenQueue = [];
+function runScreen(task) {
+  return new Promise((resolve, reject) => {
+    const start = () => {
+      screensRunning++;
+      task().then(resolve, reject).finally(() => {
+        screensRunning--;
+        const next = screenQueue.shift();
+        if (next) next();
+      });
+    };
+    if (screensRunning < MAX_SCREENS_AT_ONCE) start(); else screenQueue.push(start);
+  });
+}
+
 // Designs one direction one screen at a time, so each request is short enough to finish.
 // With onlyFailed, screens that already have a design are kept.
 async function designDirection(p, d, onlyFailed = false) {
@@ -240,7 +258,7 @@ async function designDirection(p, d, onlyFailed = false) {
   const brief = { name: d.name, description: d.description, device: d.device,
     screens: outline.map(({ html, ...rest }) => rest) };
   let error = '';
-  await Promise.all(outline.map(async (s, i) => {
+  const designOne = async (s, i) => {
     if (onlyFailed && d.screens[i]?.html && !d.screens[i].failed) return;
     const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: brief, screenIndex: i }, null, { wait: false });
     if (out && out.screens && out.screens[0]) {
@@ -250,7 +268,8 @@ async function designDirection(p, d, onlyFailed = false) {
       error = lastCallError;
     }
     save(); render();
-  }));
+  };
+  await Promise.all(outline.map((s, i) => runScreen(() => designOne(s, i))));
   d.failed = d.screens.some(x => x.failed);
   d.error = d.failed ? error : '';
   save(); render();
