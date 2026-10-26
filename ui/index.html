@@ -291,10 +291,12 @@ function openProto(id) {
 }
 
 // The screens on show: the synthesized prototype if there is one, otherwise the lead direction.
+// What the centre shows: the prototype once it exists; otherwise the direction being viewed (the lead by default).
 function sourceScreens(p) {
-  if (p.prototype) return { name: 'Prototype', screens: p.prototype.screens };
-  const d = p.directions[p.lead];
-  return d ? { name: d.name, screens: d.screens || [] } : { name: '', screens: [] };
+  if (p.prototype) return { name: 'Prototype', screens: p.prototype.screens, index: -1 };
+  const i = shown.dir ?? p.lead;
+  const d = p.directions[i];
+  return d ? { name: d.name, screens: d.screens || [], index: i } : { name: '', screens: [], index: -1 };
 }
 
 function render() {
@@ -304,34 +306,39 @@ function render() {
   $('ws').style.display = 'grid';
   $('back').style.display = '';
   $('back').onclick = () => { current = null; target = null; render(); };
-  renderLeft(p);
+  // Stage one: directions on the left. Once there is a prototype, the left shows its history instead.
+  if (p.prototype) renderHistory(p); else renderLeft(p);
   renderCenter(p);
   renderRight(p);
 }
 
 function renderLeft(p) {
+  const viewing = shown.dir ?? p.lead;
   const dirs = p.directions.map((d, i) => `
-    <div class="dir ${i === p.lead ? 'active' : ''}" data-dir="${i}">
+    <div class="dir ${i === viewing ? 'active' : ''}" data-dir="${i}">
       <h5>${esc(d.name || 'Direction ' + (i + 1))}</h5>
       <p>${esc(d.description || '')}</p>
-      <div class="opts">
-        <label><input type="radio" name="lead" data-lead="${i}" ${i === p.lead ? 'checked' : ''}> Lead direction</label>
-        <label><input type="checkbox" data-include="${i}" ${p.included.includes(i) ? 'checked' : ''}> Include</label>
-      </div>
+      <label class="opts" style="cursor:pointer"><input type="radio" name="lead" data-lead="${i}" ${i === p.lead ? 'checked' : ''}> Lead direction</label>
     </div>`).join('');
   $('left').innerHTML = `<h4>Directions</h4>
-    <div class="hint">Choose a lead direction and comment on any step, screen, or element.</div>
+    <div class="hint">Pick a lead direction. Click any direction to view it, then comment on screens or elements from other directions to bring them in.</div>
     ${p.directions.length ? dirs : '<div class="hint">' + (busy[p.id] ? 'Generating…' : 'No directions yet.') + '</div>'}`;
-  $('left').querySelectorAll('[data-lead]').forEach(r => r.onchange = () => { p.lead = Number(r.dataset.lead); p.prototype = null; save(); target = null; shown.index = 0; render(); });
-  $('left').querySelectorAll('[data-include]').forEach(c => c.onchange = () => {
-    const i = Number(c.dataset.include);
-    p.included = c.checked ? [...p.included, i] : p.included.filter(x => x !== i);
-    save();
-  });
+  $('left').querySelectorAll('[data-lead]').forEach(r => r.onchange = () => { p.lead = Number(r.dataset.lead); save(); render(); });
   $('left').querySelectorAll('[data-dir]').forEach(el => el.onclick = (e) => {
     if (e.target.closest('input')) return;
-    p.lead = Number(el.dataset.dir); p.prototype = null; save(); target = null; shown.index = 0; render();
+    shown = { ...shown, dir: Number(el.dataset.dir), index: 0 };
+    target = null; render();
   });
+}
+
+function renderHistory(p) {
+  const history = (p.versions || []).map((v, i) => `<div class="c">
+      <div class="where">${esc(new Date(v.at).toLocaleTimeString())}</div>${esc(v.label)}
+      <div style="margin-top:4px">${i === 0 ? '<span class="chip">current</span>' : `<button data-restore="${i}">Restore</button>`}</div></div>`).join('');
+  $('left').innerHTML = `<h4>History</h4>
+    <div class="hint">Every change is saved. Restore any version.</div>
+    ${history || '<div class="chip">No versions yet</div>'}`;
+  $('left').querySelectorAll('[data-restore]').forEach(b => b.onclick = () => restoreVersion(p, Number(b.dataset.restore)));
 }
 
 function renderCenter(p) {
@@ -428,7 +435,7 @@ window.addEventListener('message', (e) => {
   if (!screen) return;
   target = {
     level: m.elementId ? 'element' : 'screen',
-    screenId: screen.id, screenName: screen.name || '', directionName: src.name,
+    screenId: screen.id, screenName: screen.name || '', directionName: src.name, directionIndex: src.index,
     elementId: m.elementId || '', elementTag: m.tag || '', elementText: m.text || '',
   };
   render();
@@ -441,28 +448,24 @@ function renderRight(p) {
     : 'Screen: ' + t.screenName;
   const list = p.comments.length
     ? p.comments.map((c, i) => `<div class="c"><button data-remove="${i}">×</button>
-        <div class="where">${esc(c.screenName || '')}${c.elementId ? ' · data-el ' + esc(c.elementId) : ''}</div>${esc(c.comment)}</div>`).join('')
-    : '<div class="chip">Click a screen or element, then write what should change.</div>';
-  const history = (p.versions || []).map((v, i) => `<div class="c">
-      <div class="where">${esc(new Date(v.at).toLocaleTimeString())} · ${esc(v.label)}</div>
-      ${i === 0 ? '<span class="chip">current</span>' : `<button data-restore="${i}">Restore</button>`}</div>`).join('');
-  const multi = !p.prototype && p.included.length > 1;
-  const canSynth = p.directions.length > 0 && !busy[p.id] && (p.prototype ? p.comments.length > 0 : true);
-  const label = multi ? 'Combine ' + p.included.length + ' directions (regenerates)'
-    : !p.prototype ? 'Start prototype from lead'
-    : p.comments.length ? 'Apply ' + p.comments.length + ' change' + (p.comments.length > 1 ? 's' : '')
-    : 'Comment to change a screen';
+        <div class="where">${esc(c.directionName || '')} · ${esc(c.screenName || '')}${c.elementId ? ' · data-el ' + esc(c.elementId) : ''}</div>${esc(c.comment)}</div>`).join('')
+    : '<div class="chip">Click a screen or element, then say what to keep or change.</div>';
+  const stage1 = !p.prototype;
+  const n = p.comments.length;
+  const plural = n > 1 ? 's' : '';
+  const label = stage1
+    ? (n ? 'Build prototype from lead · ' + n + ' comment' + plural : 'Start prototype from lead')
+    : (n ? 'Apply ' + n + ' change' + plural : 'Comment to change a screen');
+  const enabled = p.directions.length > 0 && !busy[p.id] && (stage1 || n > 0);
   $('right').innerHTML = `
     <h4>Comments</h4>
     <div class="target-row"><span>Lead direction</span><span class="chip"><b>${esc(p.directions[p.lead]?.name || '—')}</b></span></div>
     <div class="target-row"><span>Target</span><span class="chip">${esc(targetText)}</span></div>
-    <textarea class="ask" id="ask" placeholder="What should change here?"></textarea>
+    <textarea class="ask" id="ask" placeholder="What should change here, or what to bring in from this direction?"></textarea>
     <div style="display:flex;gap:6px"><button id="addC" style="flex:1">Add comment</button>
       ${t ? '<button id="clearT">Clear</button>' : ''}</div>
     <div class="comments">${list}</div>
-    <button class="dark go" id="synth" ${canSynth ? '' : 'disabled'}>${label}</button>
-    <h4 style="margin-top:8px">History</h4>
-    <div class="comments" style="flex:0 0 auto;max-height:220px">${history || '<div class="chip">No versions yet</div>'}</div>`;
+    <button class="dark go" id="synth" ${enabled ? '' : 'disabled'}>${label}</button>`;
   $('addC').onclick = () => {
     const text = $('ask').value.trim();
     if (!text) return;
@@ -472,7 +475,6 @@ function renderRight(p) {
   };
   if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
   $('right').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { p.comments.splice(Number(b.dataset.remove), 1); save(); render(); });
-  $('right').querySelectorAll('[data-restore]').forEach(b => b.onclick = () => restoreVersion(p, Number(b.dataset.restore)));
   $('synth').onclick = () => synthesize(p);
 }
 
@@ -486,54 +488,55 @@ function restoreVersion(p, i) {
   if (!v) return;
   p.prototype = { name: 'Prototype', screens: JSON.parse(JSON.stringify(v.screens)) };
   recordVersion(p, 'Restored: ' + v.label);
-  p.comments = []; target = null; shown.index = 0; save(); status('Restored an earlier version'); render();
+  p.comments = []; target = null; shown = { ...shown, index: 0 }; save(); status('Restored an earlier version'); render();
 }
 
-async function synthesize(p) {
-  // Each comment names one screen (and optionally one element). Nothing else is sent, so only those change.
-  const screenComments = p.comments.map(c => ({
+function commentsForApi(p) {
+  return p.comments.map(c => ({
     directionName: c.directionName || '', screenName: c.screenName || '',
     elementId: c.elementId || '', elementTag: c.elementTag || 'div', elementText: c.elementText || '',
     elementClasses: [], comment: c.comment,
   }));
+}
 
-  // Combining several directions is the only path that regenerates screens. Ask first.
-  if (!p.prototype && p.included.length > 1) {
-    if (!confirm('Combining directions regenerates the screens with the model. Continue?')) return;
+async function synthesize(p) {
+  const comments = commentsForApi(p);
+
+  // Stage one: the lead direction, plus any other directions the comments bring in, become one prototype.
+  if (!p.prototype) {
+    const lead = p.directions[p.lead];
+    if (!lead) return;
+    if (!comments.length) {
+      p.prototype = { name: 'Prototype', screens: lead.screens || [] };
+      p.versions = [];
+      recordVersion(p, 'From ' + (lead.name || 'lead direction'));
+      shown = { ...shown, index: 0 }; save(); status('Prototype ready. Comment on a screen to change it.'); render();
+      return;
+    }
+    const others = [...new Set(p.comments.map(c => c.directionIndex))]
+      .filter(i => Number.isInteger(i) && i >= 0 && i !== p.lead);
+    const picked = [lead, ...others.map(i => p.directions[i])];
     busy[p.id] = true; render();
-    const picked = p.included.map(i => p.directions[i]);
-    const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments, generalComment: '' },
-      'Combining directions');
+    const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments: comments, generalComment: '' },
+      'Building prototype');
     busy[p.id] = false;
     if (!data) { render(); return; }
     p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
     p.versions = [];
-    recordVersion(p, 'Combined ' + picked.length + ' directions');
-    p.comments = []; target = null; shown.index = 0; save(); status('Prototype ready'); render();
+    recordVersion(p, 'Built from ' + picked.length + ' direction' + (picked.length > 1 ? 's' : ''));
+    p.comments = []; target = null; shown = { ...shown, index: 0, tab: 'prototype' };
+    save(); status('Prototype ready'); render();
     return;
   }
 
-  // First use: start from the lead direction exactly as it was generated. No model call.
-  if (!p.prototype) {
-    const lead = p.directions[p.lead];
-    if (!lead) return;
-    p.prototype = { name: 'Prototype', screens: lead.screens || [] };
-    p.versions = [];
-    recordVersion(p, 'From ' + (lead.name || 'lead direction'));
-    shown.index = 0;
-  }
-
-  if (!screenComments.length) {
-    save(); status('Prototype ready. Comment on a screen or element to change it.'); render();
-    return;
-  }
-
+  // Stage two: targeted changes. Each comment names one screen (and optionally one element); nothing else is sent.
+  if (!comments.length) return;
   busy[p.id] = true; render();
-  const data = await call({ mode: 'iterate', ...p.brief, direction: p.prototype, screenComments }, 'Applying changes');
+  const data = await call({ mode: 'iterate', ...p.brief, direction: p.prototype, screenComments: comments }, 'Applying changes');
   busy[p.id] = false;
   if (!data) { render(); return; }
   p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
-  recordVersion(p, screenComments.length + ' change' + (screenComments.length > 1 ? 's' : ''));
+  recordVersion(p, comments.length + ' change' + (comments.length > 1 ? 's' : ''));
   p.comments = []; target = null;
   save(); status('Changes applied'); render();
 }
