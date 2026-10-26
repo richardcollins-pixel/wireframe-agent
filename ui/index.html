@@ -232,45 +232,39 @@ $('mGo').onclick = async () => {
   render();
 };
 
-// At most this many screen requests run at once, so Pipedream isn't flooded with simultaneous runs.
-const MAX_SCREENS_AT_ONCE = 4;
-let screensRunning = 0;
-const screenQueue = [];
-function runScreen(task) {
-  return new Promise((resolve, reject) => {
-    const start = () => {
-      screensRunning++;
-      task().then(resolve, reject).finally(() => {
-        screensRunning--;
-        const next = screenQueue.shift();
-        if (next) next();
-      });
-    };
-    if (screensRunning < MAX_SCREENS_AT_ONCE) start(); else screenQueue.push(start);
-  });
-}
-
-// Designs one direction one screen at a time, so each request is short enough to finish.
-// With onlyFailed, screens that already have a design are kept.
+// Designs one direction in two batches. The second batch is given the first batch's designs,
+// so the screens keep the same look. Each request stays short enough to finish.
 async function designDirection(p, d, onlyFailed = false) {
   const outline = (d.screens || []).slice();
-  // Each request sends the direction's outline without the HTML, plus the one screen to design.
+  const all = outline.map((_, i) => i);
+  const half = Math.ceil(outline.length / 2);
+  const batches = [all.slice(0, half), all.slice(half)].filter(b => b.length);
+  // Each request sends the direction's outline without the HTML, plus the screens to design.
   const brief = { name: d.name, description: d.description, device: d.device,
     screens: outline.map(({ html, ...rest }) => rest) };
   let error = '';
-  const designOne = async (s, i) => {
-    if (onlyFailed && d.screens[i]?.html && !d.screens[i].failed) return;
-    const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: brief, screenIndex: i }, null, { wait: false });
-    if (out && out.screens && out.screens[0]) {
-      d.screens[i] = { ...out.screens[0], id: s.id || out.screens[0].id, name: s.name, failed: false };
+  for (const indexes of batches) {
+    const needed = !onlyFailed || indexes.some(i => !d.screens[i]?.html || d.screens[i].failed);
+    if (!needed) continue;
+    // The designs so far, so this batch matches their look.
+    const reference = d.screens.filter(s => s && s.html && !s.failed)
+      .map(({ name, title, html }) => ({ name: name || title, html }));
+    const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: brief,
+      screenIndexes: indexes, referenceScreens: reference }, null, { wait: false });
+    if (out && out.screens) {
+      indexes.forEach((i, k) => {
+        const got = out.screens[k];
+        d.screens[i] = got
+          ? { ...got, id: outline[i].id || got.id, name: outline[i].name, failed: false }
+          : { ...outline[i], failed: true };
+      });
     } else {
-      d.screens[i] = { ...s, failed: true };
       error = lastCallError;
+      indexes.forEach(i => { d.screens[i] = { ...outline[i], failed: true }; });
     }
     save(); render();
-  };
-  await Promise.all(outline.map((s, i) => runScreen(() => designOne(s, i))));
-  d.failed = d.screens.some(x => x.failed);
+  }
+  d.failed = d.screens.some(x => x && x.failed);
   d.error = d.failed ? error : '';
   save(); render();
 }
