@@ -93,7 +93,7 @@
 .screen-row { display: flex; gap: 16px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; width: 100%; }
   .screen-card { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
   .screen-card .label { font-weight: 600; font-size: 12px; }
-  .screen-card .purpose { color: var(--mute); font-size: 12px; line-height: 1.4; max-width: 260px; }
+  .screen-card .purpose { color: var(--mute); font-size: 12px; line-height: 1.4; width: 100%; margin-top: 2px; }
   .dirhead { margin-bottom: 12px; }
   .dirhead h3 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
   .dirhead p { margin: 0; color: var(--mute); }
@@ -382,7 +382,7 @@ function renderLeft(p) {
     <div class="dir ${i === viewing ? 'active' : ''}" data-dir="${i}">
       <h5>${esc(d.name || 'Direction ' + (i + 1))}</h5>
       <p>${esc(d.description || '')}</p>
-      <label class="opts" style="cursor:pointer"><input type="radio" name="lead" data-lead="${i}" ${i === p.lead ? 'checked' : ''}> Lead direction</label>
+      <label class="opts" style="cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;margin-top:8px"><input type="radio" name="lead" data-lead="${i}" ${i === p.lead ? 'checked' : ''}> Lead direction</label>
     </div>`).join('');
   $('left').innerHTML = `<h4>Directions</h4>
     <div class="hint">Pick a lead direction. Click any direction to view it, then comment on screens or elements from other directions to bring them in.</div>
@@ -418,8 +418,9 @@ function screenCard(s, forced, dirDevice) {
   const body = s.html
     ? `<div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${c.w}px;height:${c.h}px">${frame(s, dev, c.scale)}</div>`
     : `<div class="skel" style="width:${c.w}px;height:${c.h}px"></div>`;
-  return `<div class="screen-card">
-      <div class="label">${esc(s.name || 'Screen')}</div>${body}
+  return `<div class="screen-card" style="width:${c.w}px">
+      ${body}
+      <div class="label">${esc(s.name || 'Screen')}</div>
       <div class="purpose">${esc(s.description || s.purpose || '')}</div></div>`;
 }
 
@@ -534,6 +535,9 @@ function clickScript(screenId) {
       elementId: el ? el.dataset.el : '', tag: el ? el.tagName.toLowerCase() : '',
       text: el ? (el.textContent || '').trim().slice(0, 160) : '' }, '*');
   }, true);
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'wa-clear') document.querySelectorAll('.wa-sel').forEach(n => n.classList.remove('wa-sel'));
+  });
 <\/script>`;
 }
 
@@ -549,7 +553,20 @@ window.addEventListener('message', (e) => {
     screenId: screen.id, screenName: screen.name || '', directionName: src.name, directionIndex: src.index,
     elementId: m.elementId || '', elementTag: m.tag || '', elementText: m.text || '',
   };
-  render();
+  renderRight(p);
+});
+
+// Clears the selection inside every screen and in the comment panel.
+function clearFrames() {
+  document.querySelectorAll('#center iframe').forEach(f => { if (f.contentWindow) f.contentWindow.postMessage({ type: 'wa-clear' }, '*'); });
+}
+
+// Clicking the empty canvas (not a screen, not a control) deselects.
+$('center').addEventListener('click', (e) => {
+  if (e.target.closest('iframe, button, select, input, textarea, label')) return;
+  if (!target) return;
+  target = null; clearFrames();
+  if (cur()) renderRight(cur());
 });
 
 function renderRight(p) {
@@ -582,7 +599,7 @@ function renderRight(p) {
     if (!text) return;
     if (!target) { status('Click a screen or element first.', true); return; }
     p.comments.push({ ...target, comment: text });
-    target = null; $('ask').value = ''; save(); render();
+    target = null; $('ask').value = ''; save(); clearFrames(); renderRight(p);
   };
   if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
   $('right').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { p.comments.splice(Number(b.dataset.remove), 1); save(); render(); });
