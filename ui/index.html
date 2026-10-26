@@ -232,12 +232,27 @@ $('mGo').onclick = async () => {
   render();
 };
 
-// Designs one direction's screens. A direction that fails keeps its copy and can be retried.
-async function designDirection(p, d) {
-  const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: d }, null, { wait: false });
-  d.failed = !out;
-  d.error = out ? '' : lastCallError;
-  if (out) d.screens = (out.screens || []).map(withName);
+// Designs one direction one screen at a time, so each request is short enough to finish.
+// With onlyFailed, screens that already have a design are kept.
+async function designDirection(p, d, onlyFailed = false) {
+  const outline = (d.screens || []).slice();
+  // Each request sends the direction's outline without the HTML, plus the one screen to design.
+  const brief = { name: d.name, description: d.description, device: d.device,
+    screens: outline.map(({ html, ...rest }) => rest) };
+  let error = '';
+  await Promise.all(outline.map(async (s, i) => {
+    if (onlyFailed && d.screens[i]?.html && !d.screens[i].failed) return;
+    const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: brief, screenIndex: i }, null, { wait: false });
+    if (out && out.screens && out.screens[0]) {
+      d.screens[i] = { ...out.screens[0], id: s.id || out.screens[0].id, name: s.name, failed: false };
+    } else {
+      d.screens[i] = { ...s, failed: true };
+      error = lastCallError;
+    }
+    save(); render();
+  }));
+  d.failed = d.screens.some(x => x.failed);
+  d.error = d.failed ? error : '';
   save(); render();
 }
 
@@ -245,8 +260,8 @@ async function designDirection(p, d) {
 async function retryDirection(p, i) {
   const d = p.directions[i];
   if (!d || busy[p.id]) return;
-  busy[p.id] = true; d.failed = false; render();
-  await designDirection(p, d);
+  busy[p.id] = true; render();
+  await designDirection(p, d, true);
   busy[p.id] = false;
   const failed = p.directions.filter(x => x.failed).length;
   save();
@@ -467,9 +482,10 @@ function renderCenter(p) {
       ? src.screens.map(s => screenCard(s, forced, p.prototype ? null : p.directions[src.index]?.device)).join('')
       : [0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('');
     const failedDir = !p.prototype && p.directions[src.index]?.failed;
-    body = failedDir
-      ? `${head}<div class="busy">This direction did not finish${p.directions[src.index]?.error ? ': ' + esc(p.directions[src.index].error) : ''}. <button data-retry="${src.index}">Retry</button></div>`
-      : `${head}<div class="screen-row">${cards}</div>`;
+    const retryNote = failedDir
+      ? `<div class="busy">Some screens did not finish${p.directions[src.index]?.error ? ': ' + esc(p.directions[src.index].error) : ''}. <button data-retry="${src.index}">Retry</button></div>`
+      : '';
+    body = `${head}<div class="screen-row">${cards}</div>${retryNote}`;
   } else {
     const src = sourceScreens(p);
     const screens = src.screens;
