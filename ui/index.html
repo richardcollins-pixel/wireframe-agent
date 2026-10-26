@@ -102,6 +102,8 @@
   .skel-bar { height: 10px; }
   .skel { border-radius: 16px; }
   @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  /* radio buttons keep their natural size; the global input rule would stretch them across the card */
+  .dir input[type="radio"] { width: auto; padding: 0; margin: 0; border: 0; background: none; }
 </style>
 </head>
 <body>
