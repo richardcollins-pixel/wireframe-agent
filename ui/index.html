@@ -162,7 +162,7 @@ let db = { prototypes: [] };
 let current = null;          // id of the open prototype, or null for the library
 let busy = {};               // id -> true while a generation runs
 let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
-let shown = { tab: 'screens', index: 0, device: 'mobile', dir: null };
+let shown = { tab: 'screens', index: 0, device: 'auto', dir: null };
 
 function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
 function load() { try { db = JSON.parse(localStorage.getItem(KEY)) || db; } catch (_) {} }
@@ -316,7 +316,7 @@ function openProto(id) {
   const p = cur();
   if (!p.view) p.view = {};
   target = null;
-  shown = { tab: 'screens', index: 0, device: 'mobile', dir: null };
+  shown = { tab: 'screens', index: 0, device: 'auto', dir: null };
   render();
 }
 
@@ -389,7 +389,9 @@ const CARD = {
   desktop: { w: 520, h: 325, scale: 520 / 1280 },
 };
 
-function screenCard(s, dev) {
+function screenCard(s, forced) {
+  // Auto (no forced device) uses the device the generator gave this screen.
+  const dev = forced || (s.device === 'desktop' ? 'desktop' : 'mobile');
   const c = CARD[dev];
   const body = s.html
     ? `<div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${c.w}px;height:${c.h}px">${frame(s, dev, c.scale)}</div>`
@@ -411,11 +413,12 @@ function skeletonDirection(dev) {
 }
 
 function renderCenter(p) {
-  const dev = shown.device === 'desktop' ? 'desktop' : 'mobile';
+  const forced = shown.device === 'mobile' || shown.device === 'desktop' ? shown.device : null;
+  const dev = forced || 'mobile';
   const size = SIZES[dev];
   const toolbar = `<div class="toolbar">
-      <select id="device"><option value="mobile" ${dev === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${dev === 'desktop' ? 'selected' : ''}>Desktop</option></select>
-      <span class="size">${size.w} × ${size.h}</span>
+      <select id="device"><option value="auto" ${!forced ? 'selected' : ''}>Auto</option><option value="mobile" ${forced === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${forced === 'desktop' ? 'selected' : ''}>Desktop</option></select>
+      <span class="size">${forced ? size.w + ' × ' + size.h : 'each screen its own size'}</span>
       <div class="tabs"><button data-tab="screens" class="${shown.tab === 'screens' ? 'on' : ''}">Screens</button><button data-tab="prototype" class="${shown.tab === 'prototype' ? 'on' : ''}">Prototype</button></div>
     </div>`;
 
@@ -429,7 +432,7 @@ function renderCenter(p) {
       ? `<div class="dirhead"><h3>Prototype</h3><p>${src.screens.length} screens</p></div>`
       : `<div class="dirhead"><h3>${esc(src.name)}</h3><p>${esc(p.directions[src.index]?.description || '')}</p></div>`;
     const cards = src.screens.length
-      ? src.screens.map(s => screenCard(s, dev)).join('')
+      ? src.screens.map(s => screenCard(s, forced)).join('')
       : [0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('');
     body = `${head}<div class="screen-row">${cards}</div>`;
   } else {
@@ -439,8 +442,10 @@ function renderCenter(p) {
     else {
       shown.index = Math.min(Math.max(shown.index, 0), screens.length - 1);
       const s = screens[shown.index];
+      const sd = forced || (s.device === 'desktop' ? 'desktop' : 'mobile');
+      const ss = SIZES[sd];
       body = `<div class="name">${esc(src.name)} · ${esc(s.name || 'Screen')}</div>
-        <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${size.w * size.scale}px;height:${size.h * size.scale}px">${s.html ? frame(s, dev, size.scale) : ''}</div>
+        <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${ss.w * ss.scale}px;height:${ss.h * ss.scale}px">${s.html ? frame(s, sd, ss.scale) : ''}</div>
         <div class="pager"><button data-prev>←</button><span>${shown.index + 1} / ${screens.length}</span><button data-next>→</button></div>`;
     }
   }
