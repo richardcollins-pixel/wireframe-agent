@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>tds ProtoStudio</title>
+<style>
+  :root {
+    --ink: #111114; --mute: #8a8a92; --line: #e4e4e8; --soft: #f5f5f7; --pink: #d6336c;
+    font-family: Inter, system-ui, sans-serif; font-size: 13px; color: var(--ink);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f7f7f8; height: 100vh; overflow: hidden; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 7px 12px; }
+  button:hover { background: var(--soft); }
+  button.dark { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.dark:hover { background: #2b2b33; }
+  button:disabled { opacity: .4; cursor: default; }
+  input, select, textarea { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); }
+
+  .top { height: 56px; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 20px; gap: 12px; }
+  .brand { font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--pink); }
+  .top .status { margin-left: auto; color: var(--mute); font-size: 12px; }
+  .top .status.err { color: #c0392b; }
+
+  /* library */
+  .library { padding: 32px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; align-content: start; overflow: auto; height: calc(100vh - 56px); }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; }
+  .card:hover { border-color: #ccc; }
+  .card .thumb { height: 170px; background: linear-gradient(160deg, #6b2d8a, #2a0e4a); display: flex; align-items: center; justify-content: center; color: #fff; }
+  .card .thumb.blank { background: var(--soft); }
+  .card .body { padding: 12px 14px; }
+  .card h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+  .card p { margin: 0; color: var(--mute); font-size: 12px; line-height: 1.45; }
+  .card.new { border: 1px dashed #c8c8d0; background: transparent; display: flex; align-items: center; justify-content: center; min-height: 220px; color: var(--mute); }
+
+  /* modal */
+  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .35); display: none; align-items: center; justify-content: center; z-index: 10; }
+  .scrim.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; width: 400px; padding: 28px; box-shadow: 0 20px 60px rgb(0 0 0 / .2); }
+  .modal h2 { font-size: 17px; margin: 0 0 20px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  .modal h2 button { border: 0; background: none; padding: 0 4px; font-size: 18px; color: var(--mute); }
+  .modal label { display: block; color: var(--mute); font-size: 12px; margin: 14px 0 6px; }
+  .modal .foot { margin-top: 22px; }
+  .modal .foot button { width: 100%; padding: 11px; }
+  .modal .err { color: #c0392b; margin-top: 10px; min-height: 16px; font-size: 12px; }
+
+  /* workspace */
+  .ws { display: grid; grid-template-columns: 240px 1fr 300px; height: calc(100vh - 56px); }
+  .ws > section { min-height: 0; overflow: auto; }
+  .left { background: #fff; border-right: 1px solid var(--line); padding: 18px 14px; }
+  .left h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+  .left .hint { color: var(--mute); font-size: 12px; margin-bottom: 14px; line-height: 1.45; }
+  .dir { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; cursor: pointer; }
+  .dir.active { border-color: var(--ink); }
+  .dir h5 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+  .dir p { margin: 0 0 8px; color: var(--mute); font-size: 12px; line-height: 1.4; }
+  .dir .opts { display: flex; gap: 12px; font-size: 12px; color: var(--mute); }
+  .dir .opts label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+  .center { padding: 16px 20px; display: flex; flex-direction: column; min-height: 0; }
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .toolbar select { width: auto; padding: 6px 8px; }
+  .toolbar .size { color: var(--mute); font-size: 12px; }
+  .tabs { margin-left: auto; display: inline-flex; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { border: 0; border-radius: 0; background: #fff; }
+  .tabs button.on { background: var(--ink); color: #fff; }
+  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; overflow: auto; }
+  .stage .name { color: var(--mute); margin-bottom: 8px; font-size: 12px; }
+  .frame { background: #fff; border-radius: 22px; border: 1px solid var(--line); overflow: hidden; position: relative; box-shadow: 0 6px 24px rgb(0 0 0 / .06); }
+  .frame iframe { border: 0; transform-origin: 0 0; display: block; background: #fff; }
+  .frame.target { outline: 2px solid #0d99ff; outline-offset: 3px; }
+  .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; color: var(--mute); }
+  .screens-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; width: 100%; }
+  .screens-grid .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+  .screens-grid .cell span { color: var(--mute); font-size: 12px; }
+  .busy { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--mute); text-align: center; line-height: 1.6; }
+
+  .right { background: #fff; border-left: 1px solid var(--line); padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .right h4 { margin: 0; font-size: 13px; font-weight: 600; }
+  .chip { display: inline-block; background: var(--soft); border-radius: 6px; padding: 5px 8px; font-size: 12px; color: var(--mute); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .target-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--mute); }
+  .comments { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .c { border-left: 2px solid var(--line); padding: 6px 8px; font-size: 12px; line-height: 1.4; }
+  .c .where { color: var(--mute); font-size: 11px; margin-bottom: 2px; }
+  .c button { float: right; border: 0; background: none; padding: 0 2px; color: var(--mute); }
+  textarea.ask { height: 88px; resize: vertical; }
+  .right .go { width: 100%; padding: 11px; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <button id="back" style="display:none">←</button>
+  <div class="brand">tds <span>Proto</span>Studio</div>
+  <div class="status" id="status"></div>
+  <button class="dark" id="newBtn">New Prototype</button>
+</div>
+
+<div id="library" class="library"></div>
+
+<div class="ws" id="ws" style="display:none">
+  <section class="left" id="left"></section>
+  <section class="center" id="center"></section>
+  <section class="right" id="right"></section>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="modal">
+    <h2>1. Generate Design Directions <button id="close">×</button></h2>
+    <label for="mSpec">Spec Sheet</label>
+    <input id="mSpec" placeholder="Confluence link">
+    <label for="mText">…or paste the brief</label>
+    <textarea id="mText" rows="3" placeholder="Brief text (used when there's no link)" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical"></textarea>
+    <label for="mPersona">User Persona</label>
+    <select id="mPersona"><option value="zenia">Zenia</option><option value="liam">Liam</option><option value="timothy">Timothy</option></select>
+    <div class="foot"><button class="dark" id="mGo">Generate Design Directions</button></div>
+    <div class="err" id="mErr"></div>
+  </div>
+</div>
+
+<script>
+const KEY = 'tds-protostudio-v1';
+const SIZES = { desktop: { w: 1280, h: 800, scale: 0.6, label: 'Desktop' }, mobile: { w: 390, h: 874, scale: 0.72, label: 'Mobile' } };
+
+// ── state ────────────────────────────────────────────────────────────────────
+// A prototype: { id, title, brief, directions:[{name,description,screens}], lead, included:[], prototype:null, comments:[], view }
+let db = { prototypes: [] };
+let current = null;          // id of the open prototype, or null for the library
+let busy = {};               // id -> true while a generation runs
+let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
+let shown = { tab: 'prototype', index: 0, device: 'mobile' };
+
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+function load() { try { db = JSON.parse(localStorage.getItem(KEY)) || db; } catch (_) {} }
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const getProto = (id) => db.prototypes.find(p => p.id === id);
+// The flow names a screen with `title` in some outputs and `name` in others.
+const withName = (s) => ({ ...s, name: s.name || s.title || 'Screen' });
+const cur = () => getProto(current);
+
+function status(text, isErr) { const s = $('status'); s.textContent = text; s.classList.toggle('err', !!isErr); }
+
+// ── library ──────────────────────────────────────────────────────────────────
+function renderLibrary() {
+  $('ws').style.display = 'none';
+  $('library').style.display = 'grid';
+  $('back').style.display = 'none';
+  const cards = db.prototypes.map(p => `
+    <div class="card" data-open="${p.id}">
+      <div class="thumb ${p.directions.length ? '' : 'blank'}">${p.directions.length ? '' : ''}</div>
+      <div class="body"><h3>${esc(p.title || 'Untitled prototype')}</h3>
+        <p>${busy[p.id] ? 'Generating directions…' : (p.directions.length ? p.directions.length + ' directions' : 'Not generated')}</p></div>
+    </div>`).join('');
+  $('library').innerHTML = cards + `<div class="card new" id="newCard">+ New prototype</div>`;
+  $('library').querySelectorAll('[data-open]').forEach(c => c.onclick = () => openProto(c.dataset.open));
+  $('newCard').onclick = openModal;
+}
+
+// ── generate form ────────────────────────────────────────────────────────────
+function openModal() { $('mErr').textContent = ''; $('scrim').classList.add('open'); }
+function closeModal() { $('scrim').classList.remove('open'); }
+$('newBtn').onclick = openModal;
+$('close').onclick = closeModal;
+$('scrim').onclick = (e) => { if (e.target === $('scrim')) closeModal(); };
+
+$('mGo').onclick = async () => {
+  const brief = { briefUrl: $('mSpec').value.trim(), briefContent: $('mText').value.trim(), persona: $('mPersona').value };
+  if (!brief.briefUrl && !brief.briefContent) { $('mErr').textContent = 'Add a spec sheet link or paste the brief.'; return; }
+  const p = { id: 'p' + Date.now(), title: '', brief, directions: [], lead: 0, included: [], prototype: null, comments: [] };
+  db.prototypes.unshift(p); save();
+  closeModal();
+  openProto(p.id);
+  busy[p.id] = true;
+  render();
+  const data = await call({ mode: 'directions', ...brief }, 'Generating directions (several minutes)');
+  busy[p.id] = false;
+  if (!data) { render(); return; }
+  p.title = data.title || 'Untitled prototype';
+  p.directions = (data.directions || []).map(d => ({ ...d, screens: (d.screens || []).map(withName) }));
+  save(); status('Directions ready'); render();
+};
+
+// ── api ──────────────────────────────────────────────────────────────────────
+let timer = null;
+async function call(payload, label) {
+  const started = Date.now();
+  clearInterval(timer);
+  const tick = () => status(label + ' · ' + Math.floor((Date.now() - started) / 1000) + 's');
+  tick(); timer = setInterval(tick, 1000);
+  try {
+    const res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    clearInterval(timer);
+    if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+    return data;
+  } catch (e) {
+    clearInterval(timer);
+    status('Failed: ' + e.message, true);
+    return null;
+  }
+}
+
+// ── workspace ────────────────────────────────────────────────────────────────
+function openProto(id) {
+  current = id;
+  const p = cur();
+  if (!p.view) p.view = {};
+  target = null;
+  shown = { tab: 'prototype', index: 0, device: 'mobile' };
+  render();
+}
+
+// The screens on show: the synthesized prototype if there is one, otherwise the lead direction.
+function sourceScreens(p) {
+  if (p.prototype) return { name: 'Prototype', screens: p.prototype.screens };
+  const d = p.directions[p.lead];
+  return d ? { name: d.name, screens: d.screens || [] } : { name: '', screens: [] };
+}
+
+function render() {
+  if (!current || !cur()) { renderLibrary(); return; }
+  const p = cur();
+  $('library').style.display = 'none';
+  $('ws').style.display = 'grid';
+  $('back').style.display = '';
+  $('back').onclick = () => { current = null; target = null; render(); };
+  renderLeft(p);
+  renderCenter(p);
+  renderRight(p);
+}
+
+function renderLeft(p) {
+  const dirs = p.directions.map((d, i) => `
+    <div class="dir ${i === p.lead ? 'active' : ''}" data-dir="${i}">
+      <h5>${esc(d.name || 'Direction ' + (i + 1))}</h5>
+      <p>${esc(d.description || '')}</p>
+      <div class="opts">
+        <label><input type="radio" name="lead" data-lead="${i}" ${i === p.lead ? 'checked' : ''}> Lead direction</label>
+        <label><input type="checkbox" data-include="${i}" ${p.included.includes(i) ? 'checked' : ''}> Include</label>
+      </div>
+    </div>`).join('');
+  $('left').innerHTML = `<h4>Directions</h4>
+    <div class="hint">Choose a lead direction and comment on any step, screen, or element.</div>
+    ${p.directions.length ? dirs : '<div class="hint">' + (busy[p.id] ? 'Generating…' : 'No directions yet.') + '</div>'}`;
+  $('left').querySelectorAll('[data-lead]').forEach(r => r.onchange = () => { p.lead = Number(r.dataset.lead); p.prototype = null; save(); target = null; shown.index = 0; render(); });
+  $('left').querySelectorAll('[data-include]').forEach(c => c.onchange = () => {
+    const i = Number(c.dataset.include);
+    p.included = c.checked ? [...p.included, i] : p.included.filter(x => x !== i);
+    save();
+  });
+  $('left').querySelectorAll('[data-dir]').forEach(el => el.onclick = (e) => {
+    if (e.target.closest('input')) return;
+    p.lead = Number(el.dataset.dir); p.prototype = null; save(); target = null; shown.index = 0; render();
+  });
+}
+
+function renderCenter(p) {
+  if (busy[p.id]) {
+    $('center').innerHTML = '<div class="busy">Generating directions.<br>This takes several minutes.</div>';
+    return;
+  }
+  const src = sourceScreens(p);
+  const screens = src.screens;
+  if (!screens.length) {
+    $('center').innerHTML = '<div class="busy">Generate directions to see wireframes here.</div>';
+    return;
+  }
+  shown.index = Math.min(shown.index, screens.length - 1);
+  const size = SIZES[shown.device];
+  const s = screens[shown.index];
+  const toolbar = `<div class="toolbar">
+      <select id="device"><option value="mobile" ${shown.device === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${shown.device === 'desktop' ? 'selected' : ''}>Desktop</option></select>
+      <span class="size">${size.w} × ${size.h}</span>
+      <div class="tabs"><button data-tab="prototype" class="${shown.tab === 'prototype' ? 'on' : ''}">Prototype</button><button data-tab="screens" class="${shown.tab === 'screens' ? 'on' : ''}">Screens</button></div>
+    </div>`;
+  let body;
+  if (shown.tab === 'screens') {
+    body = `<div class="screens-grid">${screens.map((sc, i) => `
+      <div class="cell" data-go="${i}"><div class="frame" style="width:${SIZES[shown.device].w * 0.3}px;height:${SIZES[shown.device].h * 0.3}px">${frame(sc, shown.device, 0.3)}</div>
+      <span>${esc(sc.name || 'Screen ' + (i + 1))}</span></div>`).join('')}</div>`;
+  } else {
+    body = `<div class="name">${esc(src.name)} · ${esc(s.name || 'Screen ' + (shown.index + 1))}</div>
+      <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${size.w * size.scale}px;height:${size.h * size.scale}px">${frame(s, shown.device, size.scale)}</div>
+      <div class="pager"><button data-prev>←</button><span>${shown.index + 1} / ${screens.length}</span><button data-next>→</button></div>`;
+  }
+  $('center').innerHTML = toolbar + `<div class="stage">${body}</div>`;
+  $('device').onchange = (e) => { shown.device = e.target.value; render(); };
+  $('center').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shown.tab = b.dataset.tab; render(); });
+  $('center').querySelectorAll('[data-go]').forEach(c => c.onclick = () => { shown.index = Number(c.dataset.go); shown.tab = 'prototype'; render(); });
+  const prev = $('center').querySelector('[data-prev]'), next = $('center').querySelector('[data-next]');
+  if (prev) prev.onclick = () => { shown.index = Math.max(0, shown.index - 1); render(); };
+  if (next) next.onclick = () => { shown.index = Math.min(screens.length - 1, shown.index + 1); render(); };
+}
+
+function frame(screen, device, scale) {
+  const size = SIZES[device];
+  return `<iframe sandbox="allow-scripts" style="width:${size.w}px;height:${size.h}px;transform:scale(${scale})" srcdoc="${esc(srcdoc(screen))}"></iframe>`;
+}
+
+// Screens arrive as full HTML documents. Add the design-system stylesheet and the click
+// handler to them; if a screen is only a fragment, wrap it in a page first.
+function srcdoc(screen) {
+  const head = `<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/tds/tds.css">
+<style>
+  html,body{margin:0;min-height:100%}
+  [data-el]{cursor:pointer}
+  .wa-hover{outline:1px dashed #0d99ff!important;outline-offset:2px}
+  .wa-sel{outline:2px solid #0d99ff!important;outline-offset:2px}
+</style>`;
+  const html = screen.html || '';
+  const isDoc = /<html[\s>]/i.test(html);
+  const body = isDoc
+    ? html.replace(/<head[^>]*>/i, m => m + head).replace(/<\/body>/i, '<!--wa-->')
+    : `<!doctype html><html><head><meta charset="utf-8">${head}</head><body>${html}<!--wa--></body></html>`;
+  return body.replace('<!--wa-->', clickScript(screen.id));
+}
+
+function clickScript(screenId) {
+  return `<script>
+  const SCREEN_ID = ${JSON.stringify(screenId)};
+  let hover = null;
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('[data-el]');
+    if (hover === el) return;
+    if (hover) hover.classList.remove('wa-hover');
+    if (el) el.classList.add('wa-hover');
+    hover = el;
+  });
+  document.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const el = e.target.closest('[data-el]');
+    document.querySelectorAll('.wa-sel').forEach(n => n.classList.remove('wa-sel'));
+    if (el) el.classList.add('wa-sel');
+    parent.postMessage({ type: 'wa-target', screenId: SCREEN_ID,
+      elementId: el ? el.dataset.el : '', tag: el ? el.tagName.toLowerCase() : '',
+      text: el ? (el.textContent || '').trim().slice(0, 160) : '' }, '*');
+  }, true);
+<\/script>`;
+}
+
+window.addEventListener('message', (e) => {
+  const m = e.data;
+  if (!m || m.type !== 'wa-target' || !cur()) return;
+  const p = cur();
+  const src = sourceScreens(p);
+  const screen = src.screens.find(s => s.id === m.screenId);
+  if (!screen) return;
+  target = {
+    level: m.elementId ? 'element' : 'screen',
+    screenId: screen.id, screenName: screen.name || '', directionName: src.name,
+    elementId: m.elementId || '', elementTag: m.tag || '', elementText: m.text || '',
+  };
+  render();
+});
+
+function renderRight(p) {
+  const t = target;
+  const targetText = !t ? 'Nothing selected'
+    : t.level === 'element' ? 'data-el: ' + t.elementId
+    : t.level === 'screen' ? 'Screen: ' + t.screenName
+    : 'Whole prototype';
+  const list = p.comments.length
+    ? p.comments.map((c, i) => `<div class="c"><button data-remove="${i}">×</button>
+        <div class="where">${esc(c.level)} · ${esc(c.screenName || 'whole prototype')}${c.elementId ? ' · ' + esc(c.elementId) : ''}</div>${esc(c.comment)}</div>`).join('')
+    : '<div class="chip">No comments yet</div>';
+  const canSynth = p.directions.length > 0 && !busy[p.id];
+  const label = p.prototype ? 'Synthesize changes' : (p.included.length > 1 ? 'Synthesize ' + p.included.length + ' directions' : 'Synthesize');
+  $('right').innerHTML = `
+    <h4>Comments</h4>
+    <div class="target-row"><span>Lead direction</span><span class="chip"><b>${esc(p.directions[p.lead]?.name || '—')}</b></span></div>
+    <div class="target-row"><span>Target</span><span class="chip">${esc(targetText)}</span></div>
+    <textarea class="ask" id="ask" placeholder="Ask for changes"></textarea>
+    <div style="display:flex;gap:6px"><button id="addC" style="flex:1">Add comment</button>
+      ${t ? '<button id="clearT">Clear target</button>' : ''}</div>
+    <div class="comments">${list}</div>
+    <button class="dark go" id="synth" ${canSynth ? '' : 'disabled'}>${label}</button>`;
+  $('addC').onclick = () => {
+    const text = $('ask').value.trim();
+    if (!text) return;
+    p.comments.push({ ...(target || { level: 'prototype', screenName: '' }), comment: text });
+    target = null; $('ask').value = ''; save(); render();
+  };
+  if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
+  $('right').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { p.comments.splice(Number(b.dataset.remove), 1); save(); render(); });
+  $('synth').onclick = () => synthesize(p);
+}
+
+// Build (no prototype yet) or iterate (prototype exists), using the comments.
+async function synthesize(p) {
+  const pageComments = p.comments.filter(c => c.level === 'prototype').map(c => c.comment).join('\n');
+  const screenComments = p.comments.filter(c => c.level !== 'prototype').map(c => ({
+    directionName: c.directionName || '', screenName: c.screenName || '',
+    elementId: c.elementId || '', elementTag: c.elementTag || 'div', elementText: c.elementText || '',
+    elementClasses: [], comment: c.comment,
+  }));
+  const common = { ...p.brief, screenComments, generalComment: pageComments };
+  let payload;
+  if (p.prototype) {
+    payload = { mode: 'iterate', ...common, direction: p.prototype };
+  } else {
+    const picked = p.included.length ? p.included.map(i => p.directions[i]) : [p.directions[p.lead]];
+    payload = { mode: 'build', ...common, selectedDirections: picked };
+  }
+  busy[p.id] = true; render();
+  const data = await call(payload, p.prototype ? 'Applying changes' : 'Building prototype');
+  busy[p.id] = false;
+  if (!data) { render(); return; }
+  p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
+  p.comments = []; target = null; shown.index = 0; shown.tab = 'prototype';
+  save(); status(p.prototype.screens.length ? 'Prototype ready' : 'No screens returned'); render();
+}
+
+load();
+render();
+</script>
+</body>
+</html>
