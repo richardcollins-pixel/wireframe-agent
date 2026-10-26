@@ -366,8 +366,8 @@ function renderCenter(p) {
   shown.index = Math.min(shown.index, screens.length - 1);
   // Auto uses the device the generator gave each screen (desktop or mobile); a manual choice overrides it.
   const deviceOf = (sc) => (shown.device === 'auto' ? (sc.device === 'desktop' ? 'desktop' : 'mobile') : shown.device);
-  const size = SIZES[deviceOf(s)];
   const s = screens[shown.index];
+  const size = SIZES[deviceOf(s)];
   const toolbar = `<div class="toolbar">
       <select id="device"><option value="auto" ${shown.device === 'auto' ? 'selected' : ''}>Auto</option><option value="mobile" ${shown.device === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${shown.device === 'desktop' ? 'selected' : ''}>Desktop</option></select>
       <span class="size">${size.w} × ${size.h}</span>
