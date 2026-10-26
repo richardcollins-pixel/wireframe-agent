@@ -232,13 +232,14 @@ $('mGo').onclick = async () => {
   render();
 };
 
-// Designs one direction in two batches. The second batch is given the first batch's designs,
-// so the screens keep the same look. Each request stays short enough to finish.
+// Designs one direction in batches of two screens, one batch after another. Each batch is given the
+// designs made so far, so the screens keep the same look. Each request stays short enough to finish.
 async function designDirection(p, d, onlyFailed = false) {
   const outline = (d.screens || []).slice();
+  // Batches of two screens: a larger batch can run past Pipedream's time limit.
   const all = outline.map((_, i) => i);
-  const half = Math.ceil(outline.length / 2);
-  const batches = [all.slice(0, half), all.slice(half)].filter(b => b.length);
+  const batches = [];
+  for (let k = 0; k < all.length; k += 2) batches.push(all.slice(k, k + 2));
   // Each request sends the direction's outline without the HTML, plus the screens to design.
   const brief = { name: d.name, description: d.description, device: d.device,
     screens: outline.map(({ html, ...rest }) => rest) };
