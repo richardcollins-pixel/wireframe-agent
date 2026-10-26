@@ -162,7 +162,8 @@ const SIZES = { desktop: { w: 1280, h: 800, scale: 0.6, label: 'Desktop' }, mobi
 // A prototype: { id, title, brief, directions:[{name,description,screens}], lead, included:[], prototype:null, comments:[], view }
 let db = { prototypes: [] };
 let current = null;          // id of the open prototype, or null for the library
-let busy = {};               // id -> true while a generation runs
+let busy = {};
+let synthesizing = null;   // id of the prototype being synthesized, if any               // id -> true while a generation runs
 let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
 let shown = { tab: 'screens', index: 0, device: 'auto', dir: null };
 
@@ -451,7 +452,7 @@ function renderCenter(p) {
   if (!p.directions.length) {
     // Skeleton until the directions copy arrives.
     body = [0, 1, 2].map(() => skeletonDirection(dev)).join('');
-  } else if (shown.tab === 'screens' && busy[p.id] && !p.prototype) {
+  } else if (shown.tab === 'screens' && synthesizing === p.id && !p.prototype) {
     // Synthesis in progress: show the flow being built, not the direction being viewed.
     const lead = p.directions[p.lead];
     body = `<div class="dirhead"><h3>Synthesizing ${esc(lead?.name || '')}</h3><p>Building one flow from the lead and the comments on every direction.</p></div>
@@ -666,10 +667,10 @@ async function synthesize(p) {
     const others = [...new Set(p.comments.map(c => c.directionIndex))]
       .filter(i => Number.isInteger(i) && i >= 0 && i !== p.lead);
     const picked = [lead, ...others.map(i => p.directions[i])];
-    busy[p.id] = true; render();
+    busy[p.id] = true; synthesizing = p.id; render();
     const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments, generalComment },
       'Building prototype');
-    busy[p.id] = false;
+    busy[p.id] = false; synthesizing = null;
     if (!data) { render(); return; }
     p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
     p.versions = [];
