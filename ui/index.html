@@ -146,7 +146,7 @@ let db = { prototypes: [] };
 let current = null;          // id of the open prototype, or null for the library
 let busy = {};               // id -> true while a generation runs
 let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
-let shown = { tab: 'prototype', index: 0, device: 'mobile' };
+let shown = { tab: 'prototype', index: 0, device: 'auto' };
 
 function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
 function load() { try { db = JSON.parse(localStorage.getItem(KEY)) || db; } catch (_) {} }
@@ -286,7 +286,7 @@ function openProto(id) {
   const p = cur();
   if (!p.view) p.view = {};
   target = null;
-  shown = { tab: 'prototype', index: 0, device: 'mobile' };
+  shown = { tab: 'prototype', index: 0, device: 'auto' };
   render();
 }
 
@@ -353,21 +353,23 @@ function renderCenter(p) {
     return;
   }
   shown.index = Math.min(shown.index, screens.length - 1);
-  const size = SIZES[shown.device];
+  // Auto uses the device the generator gave each screen (desktop or mobile); a manual choice overrides it.
+  const deviceOf = (sc) => (shown.device === 'auto' ? (sc.device === 'desktop' ? 'desktop' : 'mobile') : shown.device);
+  const size = SIZES[deviceOf(s)];
   const s = screens[shown.index];
   const toolbar = `<div class="toolbar">
-      <select id="device"><option value="mobile" ${shown.device === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${shown.device === 'desktop' ? 'selected' : ''}>Desktop</option></select>
+      <select id="device"><option value="auto" ${shown.device === 'auto' ? 'selected' : ''}>Auto</option><option value="mobile" ${shown.device === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${shown.device === 'desktop' ? 'selected' : ''}>Desktop</option></select>
       <span class="size">${size.w} × ${size.h}</span>
       <div class="tabs"><button data-tab="prototype" class="${shown.tab === 'prototype' ? 'on' : ''}">Prototype</button><button data-tab="screens" class="${shown.tab === 'screens' ? 'on' : ''}">Screens</button></div>
     </div>`;
   let body;
   if (shown.tab === 'screens') {
     body = `<div class="screens-grid">${screens.map((sc, i) => `
-      <div class="cell" data-go="${i}"><div class="frame" style="width:${SIZES[shown.device].w * 0.3}px;height:${SIZES[shown.device].h * 0.3}px">${frame(sc, shown.device, 0.3)}</div>
+      <div class="cell" data-go="${i}"><div class="frame" style="width:${SIZES[deviceOf(sc)].w * 0.3}px;height:${SIZES[deviceOf(sc)].h * 0.3}px">${frame(sc, deviceOf(sc), 0.3)}</div>
       <span>${esc(sc.name || 'Screen ' + (i + 1))}</span></div>`).join('')}</div>`;
   } else {
     body = `<div class="name">${esc(src.name)} · ${esc(s.name || 'Screen ' + (shown.index + 1))}</div>
-      <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${size.w * size.scale}px;height:${size.h * size.scale}px">${frame(s, shown.device, size.scale)}</div>
+      <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${size.w * size.scale}px;height:${size.h * size.scale}px">${frame(s, deviceOf(s), size.scale)}</div>
       <div class="pager"><button data-prev>←</button><span>${shown.index + 1} / ${screens.length}</span><button data-next>→</button></div>`;
   }
   $('center').innerHTML = toolbar + `<div class="stage">${body}</div>`;
