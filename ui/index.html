@@ -161,7 +161,8 @@ const SIZES = { desktop: { w: 1280, h: 800, scale: 0.6, label: 'Desktop' }, mobi
 let db = { prototypes: [] };
 let current = null;          // id of the open prototype, or null for the library
 let busy = {};
-let synthesizing = null;   // id of the prototype being synthesized, if any               // id -> true while a generation runs
+let synthesizing = null;
+let lastCallError = '';   // the reason the most recent request failed   // id of the prototype being synthesized, if any               // id -> true while a generation runs
 let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
 let shown = { tab: 'screens', index: 0, device: 'auto', dir: null };
 
@@ -235,6 +236,7 @@ $('mGo').onclick = async () => {
 async function designDirection(p, d) {
   const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: d }, null, { wait: false });
   d.failed = !out;
+  d.error = out ? '' : lastCallError;
   if (out) d.screens = (out.screens || []).map(withName);
   save(); render();
 }
@@ -313,6 +315,7 @@ async function call(payload, label, opts = {}) {
     return normalize(result);
   } catch (e) {
     clearInterval(timer);
+    lastCallError = e.message;
     status('Failed: ' + e.message, true);
     return null;
   }
@@ -465,7 +468,7 @@ function renderCenter(p) {
       : [0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('');
     const failedDir = !p.prototype && p.directions[src.index]?.failed;
     body = failedDir
-      ? `${head}<div class="busy">This direction did not finish. <button data-retry="${src.index}">Retry</button></div>`
+      ? `${head}<div class="busy">This direction did not finish${p.directions[src.index]?.error ? ': ' + esc(p.directions[src.index].error) : ''}. <button data-retry="${src.index}">Retry</button></div>`
       : `${head}<div class="screen-row">${cards}</div>`;
   } else {
     const src = sourceScreens(p);
