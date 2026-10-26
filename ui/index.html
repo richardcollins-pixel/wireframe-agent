@@ -326,7 +326,7 @@ async function call(payload, label, opts = {}) {
     let result = first.data;
     if (first.status === 202 && first.data.jobId) {
       // Directions, build and iterate return a job id; poll the flow's get-job mode until it finishes.
-      const deadline = Date.now() + 7 * 60 * 1000;
+      const deadline = Date.now() + 15 * 60 * 1000;   // longer than a Pipedream step can run
       result = null;
       // Each status check is a separate Pipedream run, so check slowly: 10s, backing off to 30s.
       let wait = 10000;
@@ -337,7 +337,7 @@ async function call(payload, label, opts = {}) {
         if (poll.data.status === 'complete') { result = poll.data.result || poll.data; break; }
         if (poll.data.status === 'error') throw new Error(poll.data.error || 'job failed');
       }
-      if (!result) throw new Error('job did not finish in 7 minutes');
+      if (!result) throw new Error('job did not finish in 15 minutes');
     }
     clearInterval(timer);
     return normalize(result);
