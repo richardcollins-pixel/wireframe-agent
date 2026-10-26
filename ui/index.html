@@ -147,8 +147,6 @@
     <input id="mSpec" placeholder="Confluence link">
     <label for="mText">…or paste the brief</label>
     <textarea id="mText" rows="3" placeholder="Brief text (used when there's no link)" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical"></textarea>
-    <label for="mPersona">User Persona</label>
-    <select id="mPersona"><option value="zenia">Zenia</option><option value="liam">Liam</option><option value="timothy">Timothy</option></select>
     <div class="foot"><button class="dark" id="mGo">Generate Design Directions</button></div>
     <div class="err" id="mErr"></div>
   </div>
@@ -204,7 +202,7 @@ $('close').onclick = closeModal;
 $('scrim').onclick = (e) => { if (e.target === $('scrim')) closeModal(); };
 
 $('mGo').onclick = async () => {
-  const brief = { briefUrl: $('mSpec').value.trim(), briefContent: $('mText').value.trim(), persona: $('mPersona').value };
+  const brief = { briefUrl: $('mSpec').value.trim(), briefContent: $('mText').value.trim() };
   if (!brief.briefUrl && !brief.briefContent) { $('mErr').textContent = 'Add a spec sheet link or paste the brief.'; return; }
   const p = { id: 'p' + Date.now(), title: '', brief, directions: [], lead: 0, prototype: null, comments: [], versions: [] };
   db.prototypes.unshift(p); save();
@@ -258,7 +256,7 @@ async function retryDirection(p, i) {
 // The page calls the Pipedream trigger directly, the same way the design-system editor calls
 // GitHub. The trigger URL and token are kept in this browser only (localStorage).
 const SETTINGS_KEY = 'tds-protostudio-settings';
-const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'persona', 'selectedOption', 'selectedDirections', 'direction', 'screenComments', 'generalComment'];
+const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'selectedOption', 'selectedDirections', 'direction', 'screenComments', 'generalComment'];
 const TDS_CSS = 'https://richardcollins-pixel.github.io/thoughtful-design-system/tds/tds.css';
 
 function settings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (_) { return {}; } }
