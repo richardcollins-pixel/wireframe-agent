@@ -492,7 +492,9 @@ function frame(screen, device, scale) {
 // Screens arrive as full HTML documents. Add the design-system stylesheet and the click
 // handler to them; if a screen is only a fragment, wrap it in a page first.
 function srcdoc(screen) {
-  const head = `<meta name="viewport" content="width=device-width,initial-scale=1">
+  // Relative image and font paths in the design system resolve against the design system's own site.
+  const head = `<base href="https://richardcollins-pixel.github.io/thoughtful-design-system/tds/">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="${TDS_CSS}">
 <style>
   html,body{margin:0;min-height:100%}
