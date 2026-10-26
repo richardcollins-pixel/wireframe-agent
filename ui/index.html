@@ -630,8 +630,9 @@ function deleteProto(p) {
 }
 
 // Every change is recorded, newest first, so any version can be restored.
-function recordVersion(p, label) {
-  p.versions = [{ at: new Date().toISOString(), label, screens: p.prototype.screens }, ...(p.versions || [])].slice(0, 50);
+function recordVersion(p, label, screens) {
+  const list = screens || p.prototype.screens;
+  p.versions = [{ at: new Date().toISOString(), label, screens: JSON.parse(JSON.stringify(list)) }, ...(p.versions || [])].slice(0, 50);
 }
 
 function restoreVersion(p, i) {
@@ -667,7 +668,6 @@ async function synthesize(p) {
     if (!lead) return;
     if (!hasComments) {
       p.prototype = { name: 'Prototype', screens: lead.screens || [] };
-      p.versions = [];
       recordVersion(p, 'From ' + (lead.name || 'lead direction'));
       shown = { ...shown, index: 0 }; save(); status('Prototype ready. Comment on a screen to change it.'); render();
       return;
@@ -675,13 +675,13 @@ async function synthesize(p) {
     const others = [...new Set(p.comments.map(c => c.directionIndex))]
       .filter(i => Number.isInteger(i) && i >= 0 && i !== p.lead);
     const picked = [lead, ...others.map(i => p.directions[i])];
+    recordVersion(p, 'From ' + (lead.name || 'lead direction'), lead.screens || []);
     busy[p.id] = true; synthesizing = p.id; render();
     const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments, generalComment },
       'Building prototype');
     busy[p.id] = false; synthesizing = null;
     if (!data) { render(); return; }
     p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
-    p.versions = [];
     recordVersion(p, 'Built from ' + picked.length + ' direction' + (picked.length > 1 ? 's' : ''));
     p.comments = []; target = null; shown = { ...shown, index: 0, tab: 'screens', dir: null };
     save(); status('Prototype ready'); render();
