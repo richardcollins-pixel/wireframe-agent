@@ -575,6 +575,13 @@ $('center').addEventListener('click', (e) => {
   if (cur()) renderRight(cur());
 });
 
+// Saves a comment. With no target selected, it applies to the direction being viewed, or the whole flow.
+function addComment(p, text) {
+  const src = sourceScreens(p);
+  p.comments.push({ ...(target || { level: 'prototype', screenName: '', screenId: '', directionName: src.name, directionIndex: src.index }), comment: text });
+  target = null; save(); clearFrames();
+}
+
 function renderRight(p) {
   const t = target;
   const targetText = !t ? 'Nothing selected'
@@ -601,14 +608,17 @@ function renderRight(p) {
   $('addC').onclick = () => {
     const text = $('ask').value.trim();
     if (!text) return;
-    // No target selected: the comment applies to the whole flow.
-    const src = sourceScreens(p);
-    p.comments.push({ ...(target || { level: 'prototype', screenName: '', screenId: '', directionName: src.name, directionIndex: src.index }), comment: text });
-    target = null; $('ask').value = ''; save(); clearFrames(); renderRight(p);
+    addComment(p, text);
+    $('ask').value = ''; renderRight(p);
   };
   if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
   $('right').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { p.comments.splice(Number(b.dataset.remove), 1); save(); render(); });
-  $('synth').onclick = () => synthesize(p);
+  // Synthesize saves any comment still in the box first, so nothing typed is lost.
+  $('synth').onclick = () => {
+    const text = $('ask').value.trim();
+    if (text) { addComment(p, text); $('ask').value = ''; }
+    synthesize(p);
+  };
 }
 
 function deleteProto(p) {
