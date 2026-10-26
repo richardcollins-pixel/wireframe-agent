@@ -581,9 +581,7 @@ function renderRight(p) {
   const stage1 = !p.prototype;
   const n = p.comments.length;
   const plural = n > 1 ? 's' : '';
-  const label = stage1
-    ? (n ? 'Build prototype from lead · ' + n + ' comment' + plural : 'Start prototype from lead')
-    : (n ? 'Apply ' + n + ' change' + plural : 'Comment to change a screen');
+  const label = 'Synthesize';
   const enabled = p.directions.length > 0 && !busy[p.id] && (stage1 || n > 0);
   $('right').innerHTML = `
     <h4>Comments</h4>
@@ -635,7 +633,11 @@ function splitComments(p) {
     elementId: c.elementId || '', elementTag: c.elementTag || 'div', elementText: c.elementText || '',
     elementClasses: [], comment: c.comment,
   }));
-  const generalComment = p.comments.filter(c => c.level === 'prototype').map(c => c.comment).join('\n');
+  // A general comment belongs to the direction it was made on. On another direction it is a suggestion to bring in.
+  const generalComment = p.comments.filter(c => c.level === 'prototype').map(c => {
+    const otherDirection = !p.prototype && Number.isInteger(c.directionIndex) && c.directionIndex >= 0 && c.directionIndex !== p.lead;
+    return otherDirection ? 'From "' + c.directionName + '": ' + c.comment : c.comment;
+  }).join('\n');
   return { screenComments, generalComment };
 }
 
