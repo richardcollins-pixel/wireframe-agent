@@ -216,6 +216,9 @@ $('mGo').onclick = async () => {
   p.directions = (data.directions || []).map(d => ({
     ...d, name: d.title || d.name || '', screens: (d.screens || []).map(withName),
   }));
+  // The content designer chooses each direction's device. If they agree, the view follows them.
+  const devices = [...new Set(p.directions.map(d => d.device).filter(Boolean))];
+  if (devices.length === 1) shown.device = devices[0];
   save(); status('Designing screens'); render();
 
   // 2. The wireframe designer designs each direction as its own request, so screens fill in as each one finishes.
@@ -389,9 +392,9 @@ const CARD = {
   desktop: { w: 520, h: 325, scale: 520 / 1280 },
 };
 
-function screenCard(s, forced) {
-  // Auto (no forced device) uses the device the generator gave this screen.
-  const dev = forced || (s.device === 'desktop' ? 'desktop' : 'mobile');
+function screenCard(s, forced, dirDevice) {
+  // Priority: a manual choice, then the device the content designer chose for the direction, then the screen's own.
+  const dev = forced || dirDevice || (s.device === 'desktop' ? 'desktop' : 'mobile');
   const c = CARD[dev];
   const body = s.html
     ? `<div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${c.w}px;height:${c.h}px">${frame(s, dev, c.scale)}</div>`
@@ -432,7 +435,7 @@ function renderCenter(p) {
       ? `<div class="dirhead"><h3>Prototype</h3><p>${src.screens.length} screens</p></div>`
       : `<div class="dirhead"><h3>${esc(src.name)}</h3><p>${esc(p.directions[src.index]?.description || '')}</p></div>`;
     const cards = src.screens.length
-      ? src.screens.map(s => screenCard(s, forced)).join('')
+      ? src.screens.map(s => screenCard(s, forced, p.prototype ? null : p.directions[src.index]?.device)).join('')
       : [0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('');
     body = `${head}<div class="screen-row">${cards}</div>`;
   } else {
