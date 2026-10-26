@@ -597,8 +597,9 @@ function renderRight(p) {
   $('addC').onclick = () => {
     const text = $('ask').value.trim();
     if (!text) return;
-    if (!target) { status('Click a screen or element first.', true); return; }
-    p.comments.push({ ...target, comment: text });
+    // No target selected: the comment applies to the whole flow.
+    const src = sourceScreens(p);
+    p.comments.push({ ...(target || { level: 'prototype', screenName: '', screenId: '', directionName: src.name, directionIndex: src.index }), comment: text });
     target = null; $('ask').value = ''; save(); clearFrames(); renderRight(p);
   };
   if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
@@ -627,22 +628,26 @@ function restoreVersion(p, i) {
   p.comments = []; target = null; shown = { ...shown, index: 0 }; save(); status('Restored an earlier version'); render();
 }
 
-function commentsForApi(p) {
-  return p.comments.map(c => ({
+// Comments on a screen or element go to the flow as screen comments. Comments with no target apply to the whole flow.
+function splitComments(p) {
+  const screenComments = p.comments.filter(c => c.level !== 'prototype').map(c => ({
     directionName: c.directionName || '', screenName: c.screenName || '',
     elementId: c.elementId || '', elementTag: c.elementTag || 'div', elementText: c.elementText || '',
     elementClasses: [], comment: c.comment,
   }));
+  const generalComment = p.comments.filter(c => c.level === 'prototype').map(c => c.comment).join('\n');
+  return { screenComments, generalComment };
 }
 
 async function synthesize(p) {
-  const comments = commentsForApi(p);
+  const { screenComments, generalComment } = splitComments(p);
+  const hasComments = screenComments.length > 0 || !!generalComment;
 
   // Stage one: the lead direction, plus any other directions the comments bring in, become one prototype.
   if (!p.prototype) {
     const lead = p.directions[p.lead];
     if (!lead) return;
-    if (!comments.length) {
+    if (!hasComments) {
       p.prototype = { name: 'Prototype', screens: lead.screens || [] };
       p.versions = [];
       recordVersion(p, 'From ' + (lead.name || 'lead direction'));
@@ -653,7 +658,7 @@ async function synthesize(p) {
       .filter(i => Number.isInteger(i) && i >= 0 && i !== p.lead);
     const picked = [lead, ...others.map(i => p.directions[i])];
     busy[p.id] = true; render();
-    const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments: comments, generalComment: '' },
+    const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments, generalComment },
       'Building prototype');
     busy[p.id] = false;
     if (!data) { render(); return; }
@@ -665,14 +670,14 @@ async function synthesize(p) {
     return;
   }
 
-  // Stage two: targeted changes. Each comment names one screen (and optionally one element); nothing else is sent.
-  if (!comments.length) return;
+  // Stage two: targeted changes. Each screen or element comment names one screen; a whole-flow comment changes what it names.
+  if (!hasComments) return;
   busy[p.id] = true; render();
-  const data = await call({ mode: 'iterate', ...p.brief, direction: p.prototype, screenComments: comments }, 'Applying changes');
+  const data = await call({ mode: 'iterate', ...p.brief, direction: p.prototype, screenComments, generalComment }, 'Applying changes');
   busy[p.id] = false;
   if (!data) { render(); return; }
   p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
-  recordVersion(p, comments.length + ' change' + (comments.length > 1 ? 's' : ''));
+  recordVersion(p, p.comments.length + ' change' + (p.comments.length > 1 ? 's' : ''));
   p.comments = []; target = null;
   save(); status('Changes applied'); render();
 }
