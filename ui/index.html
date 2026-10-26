@@ -90,6 +90,18 @@
   .c button { float: right; border: 0; background: none; padding: 0 2px; color: var(--mute); }
   textarea.ask { height: 88px; resize: vertical; }
   .right .go { width: 100%; padding: 11px; }
+.screen-row { display: flex; gap: 16px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; width: 100%; }
+  .screen-card { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .screen-card .label { font-weight: 600; font-size: 12px; }
+  .screen-card .purpose { color: var(--mute); font-size: 12px; line-height: 1.4; max-width: 260px; }
+  .dirhead { margin-bottom: 12px; }
+  .dirhead h3 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  .dirhead p { margin: 0; color: var(--mute); }
+  .dirblock { margin-bottom: 28px; width: 100%; }
+  .skel, .skel-bar { background: linear-gradient(90deg, #ececef 0%, #f6f6f8 50%, #ececef 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 8px; }
+  .skel-bar { height: 10px; }
+  .skel { border-radius: 16px; }
+  @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 </style>
 </head>
 <body>
@@ -150,7 +162,7 @@ let db = { prototypes: [] };
 let current = null;          // id of the open prototype, or null for the library
 let busy = {};               // id -> true while a generation runs
 let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
-let shown = { tab: 'prototype', index: 0, device: 'auto' };
+let shown = { tab: 'screens', index: 0, device: 'mobile', dir: null };
 
 function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
 function load() { try { db = JSON.parse(localStorage.getItem(KEY)) || db; } catch (_) {} }
@@ -191,17 +203,29 @@ $('scrim').onclick = (e) => { if (e.target === $('scrim')) closeModal(); };
 $('mGo').onclick = async () => {
   const brief = { briefUrl: $('mSpec').value.trim(), briefContent: $('mText').value.trim(), persona: $('mPersona').value };
   if (!brief.briefUrl && !brief.briefContent) { $('mErr').textContent = 'Add a spec sheet link or paste the brief.'; return; }
-  const p = { id: 'p' + Date.now(), title: '', brief, directions: [], lead: 0, included: [], prototype: null, comments: [] };
+  const p = { id: 'p' + Date.now(), title: '', brief, directions: [], lead: 0, prototype: null, comments: [], versions: [] };
   db.prototypes.unshift(p); save();
   closeModal();
   openProto(p.id);
-  busy[p.id] = true;
-  render();
-  const data = await call({ mode: 'directions', ...brief }, 'Generating directions (several minutes)');
-  busy[p.id] = false;
-  if (!data) { render(); return; }
+  busy[p.id] = true; render();
+
+  // 1. The content designer writes the three directions: names, descriptions, screen titles and purposes.
+  const data = await call({ mode: 'directions', ...brief }, 'Writing directions');
+  if (!data) { busy[p.id] = false; render(); return; }
   p.title = data.title || 'Untitled prototype';
-  p.directions = (data.directions || []).map(d => ({ ...d, screens: (d.screens || []).map(withName) }));
+  p.directions = (data.directions || []).map(d => ({
+    ...d, name: d.title || d.name || '', screens: (d.screens || []).map(withName),
+  }));
+  save(); status('Designing screens'); render();
+
+  // 2. The wireframe designer designs each direction as its own request, so screens fill in as each one finishes.
+  await Promise.all(p.directions.map(async (d) => {
+    const out = await call({ mode: 'wireframes', ...brief, selectedOption: d }, null);
+    if (!out) return;
+    d.screens = (out.screens || []).map(withName);
+    save(); render();
+  }));
+  busy[p.id] = false;
   save(); status('Directions ready'); render();
 };
 
@@ -209,7 +233,7 @@ $('mGo').onclick = async () => {
 // The page calls the Pipedream trigger directly, the same way the design-system editor calls
 // GitHub. The trigger URL and token are kept in this browser only (localStorage).
 const SETTINGS_KEY = 'tds-protostudio-settings';
-const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'persona', 'selectedDirections', 'direction', 'screenComments', 'generalComment'];
+const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'persona', 'selectedOption', 'selectedDirections', 'direction', 'screenComments', 'generalComment'];
 const TDS_CSS = 'https://richardcollins-pixel.github.io/thoughtful-design-system/tds/tds.css';
 
 function settings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (_) { return {}; } }
@@ -238,7 +262,7 @@ async function call(payload, label) {
   const started = Date.now();
   clearInterval(timer);
   const tick = () => status(label + ' · ' + Math.floor((Date.now() - started) / 1000) + 's');
-  tick(); timer = setInterval(tick, 1000);
+  if (label) { tick(); timer = setInterval(tick, 1000); }   // parallel requests pass no label and show no timer
   try {
     const agentInput = {};
     FLOW_FIELDS.forEach(k => { if (k in payload) agentInput[k] = payload[k]; });
@@ -292,7 +316,7 @@ function openProto(id) {
   const p = cur();
   if (!p.view) p.view = {};
   target = null;
-  shown = { tab: 'prototype', index: 0, device: 'auto' };
+  shown = { tab: 'screens', index: 0, device: 'mobile', dir: null };
   render();
 }
 
@@ -325,6 +349,13 @@ function render() {
 
 function renderLeft(p) {
   const viewing = shown.dir ?? p.lead;
+  if (!p.directions.length) {
+    // Skeleton while the directions are being written.
+    $('left').innerHTML = `<h4>Directions</h4>
+      <div class="hint">Writing three directions for this brief.</div>
+      ${[0, 1, 2].map(() => '<div class="dir"><div class="skel-bar" style="width:70%"></div><div class="skel-bar" style="width:100%;margin-top:8px"></div><div class="skel-bar" style="width:85%;margin-top:6px"></div></div>').join('')}`;
+    return;
+  }
   const dirs = p.directions.map((d, i) => `
     <div class="dir ${i === viewing ? 'active' : ''}" data-dir="${i}">
       <h5>${esc(d.name || 'Direction ' + (i + 1))}</h5>
@@ -333,7 +364,7 @@ function renderLeft(p) {
     </div>`).join('');
   $('left').innerHTML = `<h4>Directions</h4>
     <div class="hint">Pick a lead direction. Click any direction to view it, then comment on screens or elements from other directions to bring them in.</div>
-    ${p.directions.length ? dirs : '<div class="hint">' + (busy[p.id] ? 'Generating…' : 'No directions yet.') + '</div>'}`;
+    ${dirs}`;
   $('left').querySelectorAll('[data-lead]').forEach(r => r.onchange = () => { p.lead = Number(r.dataset.lead); save(); render(); });
   $('left').querySelectorAll('[data-dir]').forEach(el => el.onclick = (e) => {
     if (e.target.closest('input')) return;
@@ -352,44 +383,74 @@ function renderHistory(p) {
   $('left').querySelectorAll('[data-restore]').forEach(b => b.onclick = () => restoreVersion(p, Number(b.dataset.restore)));
 }
 
+// Frame sizes for the screens row: each screen is drawn at this width and scaled to fit.
+const CARD = {
+  mobile:  { w: 260, h: 583, scale: 260 / 390 },
+  desktop: { w: 520, h: 325, scale: 520 / 1280 },
+};
+
+function screenCard(s, dev) {
+  const c = CARD[dev];
+  const body = s.html
+    ? `<div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${c.w}px;height:${c.h}px">${frame(s, dev, c.scale)}</div>`
+    : `<div class="skel" style="width:${c.w}px;height:${c.h}px"></div>`;
+  return `<div class="screen-card">
+      <div class="label">${esc(s.name || 'Screen')}</div>${body}
+      <div class="purpose">${esc(s.description || s.purpose || '')}</div></div>`;
+}
+
+function skeletonDirection(dev) {
+  const c = CARD[dev];
+  const cards = [0, 1, 2].map(() => `<div class="screen-card">
+      <div class="skel-bar" style="width:120px"></div>
+      <div class="skel" style="width:${c.w}px;height:${c.h}px;margin-top:6px"></div>
+      <div class="skel-bar" style="width:200px;margin-top:8px"></div></div>`).join('');
+  return `<div class="dirblock"><div class="skel-bar" style="width:200px;height:14px"></div>
+    <div class="skel-bar" style="width:320px;margin-top:8px"></div>
+    <div class="screen-row">${cards}</div></div>`;
+}
+
 function renderCenter(p) {
-  if (busy[p.id]) {
-    $('center').innerHTML = '<div class="busy">Generating directions.<br>This takes several minutes.</div>';
-    return;
-  }
-  const src = sourceScreens(p);
-  const screens = src.screens;
-  if (!screens.length) {
-    $('center').innerHTML = '<div class="busy">Generate directions to see wireframes here.</div>';
-    return;
-  }
-  shown.index = Math.min(shown.index, screens.length - 1);
-  // Auto uses the device the generator gave each screen (desktop or mobile); a manual choice overrides it.
-  const deviceOf = (sc) => (shown.device === 'auto' ? (sc.device === 'desktop' ? 'desktop' : 'mobile') : shown.device);
-  const s = screens[shown.index];
-  const size = SIZES[deviceOf(s)];
+  const dev = shown.device === 'desktop' ? 'desktop' : 'mobile';
+  const size = SIZES[dev];
   const toolbar = `<div class="toolbar">
-      <select id="device"><option value="auto" ${shown.device === 'auto' ? 'selected' : ''}>Auto</option><option value="mobile" ${shown.device === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${shown.device === 'desktop' ? 'selected' : ''}>Desktop</option></select>
+      <select id="device"><option value="mobile" ${dev === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${dev === 'desktop' ? 'selected' : ''}>Desktop</option></select>
       <span class="size">${size.w} × ${size.h}</span>
-      <div class="tabs"><button data-tab="prototype" class="${shown.tab === 'prototype' ? 'on' : ''}">Prototype</button><button data-tab="screens" class="${shown.tab === 'screens' ? 'on' : ''}">Screens</button></div>
+      <div class="tabs"><button data-tab="screens" class="${shown.tab === 'screens' ? 'on' : ''}">Screens</button><button data-tab="prototype" class="${shown.tab === 'prototype' ? 'on' : ''}">Prototype</button></div>
     </div>`;
+
   let body;
-  if (shown.tab === 'screens') {
-    body = `<div class="screens-grid">${screens.map((sc, i) => `
-      <div class="cell" data-go="${i}"><div class="frame" style="width:${SIZES[deviceOf(sc)].w * 0.3}px;height:${SIZES[deviceOf(sc)].h * 0.3}px">${frame(sc, deviceOf(sc), 0.3)}</div>
-      <span>${esc(sc.name || 'Screen ' + (i + 1))}</span></div>`).join('')}</div>`;
+  if (!p.directions.length) {
+    // Skeleton until the directions copy arrives.
+    body = [0, 1, 2].map(() => skeletonDirection(dev)).join('');
+  } else if (shown.tab === 'screens') {
+    const src = sourceScreens(p);
+    const head = p.prototype
+      ? `<div class="dirhead"><h3>Prototype</h3><p>${src.screens.length} screens</p></div>`
+      : `<div class="dirhead"><h3>${esc(src.name)}</h3><p>${esc(p.directions[src.index]?.description || '')}</p></div>`;
+    const cards = src.screens.length
+      ? src.screens.map(s => screenCard(s, dev)).join('')
+      : [0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('');
+    body = `${head}<div class="screen-row">${cards}</div>`;
   } else {
-    body = `<div class="name">${esc(src.name)} · ${esc(s.name || 'Screen ' + (shown.index + 1))}</div>
-      <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${size.w * size.scale}px;height:${size.h * size.scale}px">${frame(s, deviceOf(s), size.scale)}</div>
-      <div class="pager"><button data-prev>←</button><span>${shown.index + 1} / ${screens.length}</span><button data-next>→</button></div>`;
+    const src = sourceScreens(p);
+    const screens = src.screens;
+    if (!screens.length) { body = '<div class="busy">Designing screens…</div>'; }
+    else {
+      shown.index = Math.min(Math.max(shown.index, 0), screens.length - 1);
+      const s = screens[shown.index];
+      body = `<div class="name">${esc(src.name)} · ${esc(s.name || 'Screen')}</div>
+        <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${size.w * size.scale}px;height:${size.h * size.scale}px">${s.html ? frame(s, dev, size.scale) : ''}</div>
+        <div class="pager"><button data-prev>←</button><span>${shown.index + 1} / ${screens.length}</span><button data-next>→</button></div>`;
+    }
   }
   $('center').innerHTML = toolbar + `<div class="stage">${body}</div>`;
   $('device').onchange = (e) => { shown.device = e.target.value; render(); };
   $('center').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shown.tab = b.dataset.tab; render(); });
-  $('center').querySelectorAll('[data-go]').forEach(c => c.onclick = () => { shown.index = Number(c.dataset.go); shown.tab = 'prototype'; render(); });
   const prev = $('center').querySelector('[data-prev]'), next = $('center').querySelector('[data-next]');
+  const count = sourceScreens(p).screens.length;
   if (prev) prev.onclick = () => { shown.index = Math.max(0, shown.index - 1); render(); };
-  if (next) next.onclick = () => { shown.index = Math.min(screens.length - 1, shown.index + 1); render(); };
+  if (next) next.onclick = () => { shown.index = Math.min(count - 1, shown.index + 1); render(); };
 }
 
 function frame(screen, device, scale) {
