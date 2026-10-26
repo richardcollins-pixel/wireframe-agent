@@ -236,6 +236,9 @@ async function call(payload, label) {
   try {
     const agentInput = {};
     FLOW_FIELDS.forEach(k => { if (k in payload) agentInput[k] = payload[k]; });
+    // Ask the flow to hold this request open until the result is ready (one Pipedream run).
+    // A flow that doesn't know this flag answers "processing" and the page falls back to checking.
+    agentInput.waitForResult = true;
     const first = await post(s.triggerUrl, s.token, agentInput);
     let result = first.data;
     if (first.status === 202 && first.data.jobId) {
