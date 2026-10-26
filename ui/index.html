@@ -233,7 +233,7 @@ $('mGo').onclick = async () => {
 
 // Designs one direction's screens. A direction that fails keeps its copy and can be retried.
 async function designDirection(p, d) {
-  const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: d }, null);
+  const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: d }, null, { wait: false });
   d.failed = !out;
   if (out) d.screens = (out.screens || []).map(withName);
   save(); render();
@@ -279,7 +279,7 @@ async function post(url, token, agentInput) {
 }
 
 let timer = null;
-async function call(payload, label) {
+async function call(payload, label, opts = {}) {
   const s = settings();
   if (!s.triggerUrl) { openSettings(); status('Add the trigger URL in Settings first.', true); return null; }
   const started = Date.now();
@@ -291,7 +291,7 @@ async function call(payload, label) {
     FLOW_FIELDS.forEach(k => { if (k in payload) agentInput[k] = payload[k]; });
     // Ask the flow to hold this request open until the result is ready (one Pipedream run).
     // A flow that doesn't know this flag answers "processing" and the page falls back to checking.
-    agentInput.waitForResult = true;
+    agentInput.waitForResult = opts.wait !== false;
     const first = await post(s.triggerUrl, s.token, agentInput);
     let result = first.data;
     if (first.status === 202 && first.data.jobId) {
