@@ -222,15 +222,34 @@ $('mGo').onclick = async () => {
   save(); status('Designing screens'); render();
 
   // 2. The wireframe designer designs each direction as its own request, so screens fill in as each one finishes.
-  await Promise.all(p.directions.map(async (d) => {
-    const out = await call({ mode: 'wireframes', ...brief, selectedOption: d }, null);
-    if (!out) return;
-    d.screens = (out.screens || []).map(withName);
-    save(); render();
-  }));
+  await Promise.all(p.directions.map(d => designDirection(p, d)));
   busy[p.id] = false;
-  save(); status('Directions ready'); render();
+  const failed = p.directions.filter(d => d.failed).length;
+  save();
+  status(failed ? failed + ' direction' + (failed > 1 ? 's' : '') + ' did not finish. Use Retry in the screens view.' : 'Directions ready', failed > 0);
+  render();
 };
+
+// Designs one direction's screens. A direction that fails keeps its copy and can be retried.
+async function designDirection(p, d) {
+  const out = await call({ mode: 'wireframes', ...p.brief, selectedOption: d }, null);
+  d.failed = !out;
+  if (out) d.screens = (out.screens || []).map(withName);
+  save(); render();
+}
+
+// Retries one direction after it failed.
+async function retryDirection(p, i) {
+  const d = p.directions[i];
+  if (!d || busy[p.id]) return;
+  busy[p.id] = true; d.failed = false; render();
+  await designDirection(p, d);
+  busy[p.id] = false;
+  const failed = p.directions.filter(x => x.failed).length;
+  save();
+  status(failed ? failed + ' still failing. Try again.' : 'Directions ready', failed > 0);
+  render();
+}
 
 // ── api ──────────────────────────────────────────────────────────────────────
 // The page calls the Pipedream trigger directly, the same way the design-system editor calls
@@ -437,7 +456,10 @@ function renderCenter(p) {
     const cards = src.screens.length
       ? src.screens.map(s => screenCard(s, forced, p.prototype ? null : p.directions[src.index]?.device)).join('')
       : [0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('');
-    body = `${head}<div class="screen-row">${cards}</div>`;
+    const failedDir = !p.prototype && p.directions[src.index]?.failed;
+    body = failedDir
+      ? `${head}<div class="busy">This direction did not finish. <button data-retry="${src.index}">Retry</button></div>`
+      : `${head}<div class="screen-row">${cards}</div>`;
   } else {
     const src = sourceScreens(p);
     const screens = src.screens;
@@ -454,6 +476,7 @@ function renderCenter(p) {
   }
   $('center').innerHTML = toolbar + `<div class="stage">${body}</div>`;
   $('device').onchange = (e) => { shown.device = e.target.value; render(); };
+  $('center').querySelectorAll('[data-retry]').forEach(b => b.onclick = () => retryDirection(p, Number(b.dataset.retry)));
   $('center').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shown.tab = b.dataset.tab; render(); });
   const prev = $('center').querySelector('[data-prev]'), next = $('center').querySelector('[data-next]');
   const count = sourceScreens(p).screens.length;
