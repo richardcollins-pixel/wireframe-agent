@@ -396,10 +396,14 @@ function srcdoc(screen) {
   .wa-sel{outline:2px solid #0d99ff!important;outline-offset:2px}
 </style>`;
   const html = screen.html || '';
+  // Charcoal (wireframe) fidelity, the same switch the editor's Charcoal toggle sets on its canvas:
+  // accent colours and imagery drop out and gradients flatten, so screens read as wireframes.
+  const fidelity = 'data-fidelity="wireframe"';
   const isDoc = /<html[\s>]/i.test(html);
   const body = isDoc
-    ? html.replace(/<head[^>]*>/i, m => m + head).replace(/<\/body>/i, '<!--wa-->')
-    : `<!doctype html><html><head><meta charset="utf-8">${head}</head><body>${html}<!--wa--></body></html>`;
+    ? html.replace(/<html([^>]*)>/i, (m, attrs) => `<html${attrs} ${fidelity}>`)
+        .replace(/<head[^>]*>/i, m => m + head).replace(/<\/body>/i, '<!--wa-->')
+    : `<!doctype html><html ${fidelity}><head><meta charset="utf-8">${head}</head><body>${html}<!--wa--></body></html>`;
   return body.replace('<!--wa-->', clickScript(screen.id));
 }
 
