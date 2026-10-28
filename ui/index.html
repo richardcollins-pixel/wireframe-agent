@@ -287,7 +287,7 @@ async function retryDirection(p, i) {
 // The page calls the Pipedream trigger directly, the same way the design-system editor calls
 // GitHub. The trigger URL and token are kept in this browser only (localStorage).
 const SETTINGS_KEY = 'tds-protostudio-settings';
-const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'selectedOption', 'selectedDirections', 'direction', 'screenComments', 'generalComment'];
+const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'selectedOption', 'selectedDirections', 'direction', 'screenComments', 'generalComment', 'screenIndexes', 'referenceScreens'];
 const TDS_CSS = 'https://richardcollins-pixel.github.io/thoughtful-design-system/tds/tds.css';
 
 function settings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (_) { return {}; } }
