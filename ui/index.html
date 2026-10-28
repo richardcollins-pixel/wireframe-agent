@@ -47,63 +47,36 @@
   .modal .foot { margin-top: 22px; }
   .modal .foot button { width: 100%; padding: 11px; }
   .modal .err { color: #c0392b; margin-top: 10px; min-height: 16px; font-size: 12px; }
+  .modal textarea { resize: vertical; }
 
-  /* workspace */
-  .ws { display: grid; grid-template-columns: 240px 1fr 300px; height: calc(100vh - 56px); }
-  .ws > section { min-height: 0; overflow: auto; }
-  .left { background: #fff; border-right: 1px solid var(--line); padding: 18px 14px; }
-  .left h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
-  .left .hint { color: var(--mute); font-size: 12px; margin-bottom: 14px; line-height: 1.45; }
-  .dir { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; cursor: pointer; }
-  .dir.active { border-color: var(--ink); }
-  .dir h5 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
-  .dir p { margin: 0 0 8px; color: var(--mute); font-size: 12px; line-height: 1.4; }
-  .dir .opts { display: flex; gap: 12px; font-size: 12px; color: var(--mute); }
-  .dir .opts label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-
-  .center { padding: 16px 20px; display: flex; flex-direction: column; min-height: 0; }
-  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .toolbar select { width: auto; padding: 6px 8px; }
-  .toolbar .size { color: var(--mute); font-size: 12px; }
-  .tabs { margin-left: auto; display: inline-flex; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .tabs button { border: 0; border-radius: 0; background: #fff; }
-  .tabs button.on { background: var(--ink); color: #fff; }
-  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; overflow: auto; }
-  .stage .name { color: var(--mute); margin-bottom: 8px; font-size: 12px; }
-  .frame { background: #fff; border-radius: 22px; border: 1px solid var(--line); overflow: hidden; position: relative; box-shadow: 0 6px 24px rgb(0 0 0 / .06); }
-  .frame iframe { border: 0; transform-origin: 0 0; display: block; background: #fff; }
-  .frame.target { outline: 2px solid #0d99ff; outline-offset: 3px; }
-  .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; color: var(--mute); }
-  .screens-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; width: 100%; }
-  .screens-grid .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
-  .screens-grid .cell span { color: var(--mute); font-size: 12px; }
-  .busy { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--mute); text-align: center; line-height: 1.6; }
-
-  .right { background: #fff; border-left: 1px solid var(--line); padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; }
-  .right h4 { margin: 0; font-size: 13px; font-weight: 600; }
-  .chip { display: inline-block; background: var(--soft); border-radius: 6px; padding: 5px 8px; font-size: 12px; color: var(--mute); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip b { color: var(--ink); font-weight: 600; }
-  .target-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--mute); }
-  .comments { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-  .c { border-left: 2px solid var(--line); padding: 6px 8px; font-size: 12px; line-height: 1.4; }
-  .c .where { color: var(--mute); font-size: 11px; margin-bottom: 2px; }
-  .c button { float: right; border: 0; background: none; padding: 0 2px; color: var(--mute); }
-  textarea.ask { height: 88px; resize: vertical; }
-  .right .go { width: 100%; padding: 11px; }
-.screen-row { display: flex; gap: 16px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; width: 100%; }
-  .screen-card { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
-  .screen-card .label { font-weight: 600; font-size: 12px; }
-  .screen-card .purpose { color: var(--mute); font-size: 12px; line-height: 1.4; width: 100%; margin-top: 2px; }
-  .dirhead { margin-bottom: 12px; }
-  .dirhead h3 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
-  .dirhead p { margin: 0; color: var(--mute); }
-  .dirblock { margin-bottom: 28px; width: 100%; }
+  /* canvas: every direction on one surface, zoomable and scrollable */
+  .ws { height: calc(100vh - 56px); }
+  .canvas { position: relative; height: 100%; }
+  .viewport { position: absolute; inset: 0; overflow: hidden; cursor: grab; background: #f2f2f4; touch-action: none; }
+  .viewport.dragging { cursor: grabbing; }
+  .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .row { margin-bottom: 150px; }
+  .row-head { max-width: 900px; margin-bottom: 22px; }
+  .row-head h3 { font-size: 18px; margin: 0 0 6px; font-weight: 600; }
+  .row-head p { margin: 0; color: var(--mute); font-size: 13px; line-height: 1.45; }
+  .row-screens { display: flex; gap: 56px; align-items: flex-start; }
+  .screen { display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
+  .screen .label { font-weight: 600; font-size: 14px; }
+  .screen .purpose { color: var(--mute); font-size: 13px; line-height: 1.4; }
+  .frame { position: relative; background: #fff; border-radius: 22px; border: 1px solid var(--line); overflow: hidden; box-shadow: 0 6px 24px rgb(0 0 0 / .06); }
+  .frame iframe { border: 0; display: block; background: #fff; }
+  /* sits over each screen so wheel and drag reach the canvas instead of the screen */
+  .shield { position: absolute; inset: 0; }
   .skel, .skel-bar { background: linear-gradient(90deg, #ececef 0%, #f6f6f8 50%, #ececef 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 8px; }
   .skel-bar { height: 10px; }
-  .skel { border-radius: 16px; }
+  .skel { border-radius: 22px; }
   @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
-  /* radio buttons keep their natural size; the global input rule would stretch them across the card */
-  .dir input[type="radio"] { width: auto; padding: 0; margin: 0; border: 0; background: none; }
+  .busy { color: var(--mute); line-height: 1.6; margin-top: 8px; }
+  .zoom { position: absolute; right: 16px; bottom: 16px; display: flex; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+  .zoom button { padding: 6px 10px; min-width: 40px; }
+  .zoom button#zLevel { min-width: 64px; }
+  /* radio buttons keep their natural size; the global input rule would stretch them */
+  input[type="radio"] { width: auto; padding: 0; margin: 0; border: 0; background: none; }
 </style>
 </head>
 <body>
@@ -113,7 +86,7 @@
   <div class="brand" id="brand">tds <span>Proto</span>Studio</div>
   <div id="projectBar" style="display:none;align-items:center;gap:8px">
     <input id="projName" style="width:320px;font-weight:600" aria-label="Project name">
-    <button id="shareBtn" title="Copy a link others can open">Share</button>
+    <button id="shareBtn" title="Save the project and copy a link others can open">Share</button>
     <button id="projDelete" title="Delete project" aria-label="Delete project" style="padding:7px 10px;display:flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
   </div>
   <div class="status" id="status"></div>
@@ -124,9 +97,17 @@
 <div id="library" class="library"></div>
 
 <div class="ws" id="ws" style="display:none">
-  <section class="left" id="left"></section>
-  <section class="center" id="center"></section>
-  <section class="right" id="right"></section>
+  <div class="canvas">
+    <div class="viewport" id="vp">
+      <div class="world" id="world"></div>
+    </div>
+    <div class="zoom">
+      <button id="zOut" title="Zoom out">−</button>
+      <button id="zLevel" title="Reset to 100%">100%</button>
+      <button id="zIn" title="Zoom in">+</button>
+      <button id="zFit" title="Fit everything">Fit</button>
+    </div>
+  </div>
 </div>
 
 <div class="scrim" id="setScrim">
@@ -143,11 +124,11 @@
 
 <div class="scrim" id="scrim">
   <div class="modal">
-    <h2>1. Generate Design Directions <button id="close">×</button></h2>
+    <h2>New prototype <button id="close">×</button></h2>
     <label for="mSpec">Spec Sheet</label>
     <input id="mSpec" placeholder="Confluence link">
     <label for="mText">…or paste the brief</label>
-    <textarea id="mText" rows="3" placeholder="Brief text (used when there's no link)" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical"></textarea>
+    <textarea id="mText" rows="3" placeholder="Brief text (used when there's no link)"></textarea>
     <label for="mDevice">Device</label>
     <select id="mDevice"><option value="mobile">Mobile (390 × 874)</option><option value="desktop">Desktop (1280 × 800)</option></select>
     <div class="foot"><button class="dark" id="mGo">Generate Design Directions</button></div>
@@ -157,17 +138,14 @@
 
 <script>
 const KEY = 'tds-protostudio-v1';
-const SIZES = { desktop: { w: 1280, h: 800, scale: 0.6, label: 'Desktop' }, mobile: { w: 390, h: 874, scale: 0.72, label: 'Mobile' } };
+const SIZES = { desktop: { w: 1280, h: 800, label: 'Desktop' }, mobile: { w: 390, h: 874, label: 'Mobile' } };
 
 // ── state ────────────────────────────────────────────────────────────────────
-// A prototype: { id, title, brief, directions:[{name,description,screens}], lead, included:[], prototype:null, comments:[], view }
+// A prototype: { id, title, brief: { briefUrl, briefContent, device }, directions: [{ name, description, device, screens, failed, error }], shareId }
 let db = { prototypes: [] };
-let current = null;          // id of the open prototype, or null for the library
-let busy = {};
-let synthesizing = null;
-let lastCallError = '';   // the reason the most recent request failed   // id of the prototype being synthesized, if any               // id -> true while a generation runs
-let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
-let shown = { tab: 'screens', index: 0, dir: null };
+let current = null;   // id of the open prototype, or null for the library
+let busy = {};        // id -> true while directions are being written or designed
+let lastCallError = '';
 
 // The library is kept in IndexedDB. localStorage holds about 5 MB, and a few prototypes with their screen HTML
 // filled it, so the save threw in the middle of a generation. IndexedDB has far more room.
@@ -216,9 +194,10 @@ async function load() {
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const getProto = (id) => db.prototypes.find(p => p.id === id);
+const cur = () => getProto(current);
 // The flow names a screen with `title` in some outputs and `name` in others.
 const withName = (s) => ({ ...s, name: s.name || s.title || 'Screen' });
-const cur = () => getProto(current);
+const deviceOf = (p) => (p.brief?.device === 'desktop' ? 'desktop' : 'mobile');
 
 function status(text, isErr) { const s = $('status'); s.textContent = text; s.classList.toggle('err', !!isErr); }
 
@@ -231,7 +210,7 @@ function renderLibrary() {
   $('brand').style.display = '';
   const cards = db.prototypes.map(p => `
     <div class="card" data-open="${p.id}">
-      <div class="thumb ${p.directions.length ? '' : 'blank'}">${p.directions.length ? '' : ''}</div>
+      <div class="thumb ${p.directions.length ? '' : 'blank'}"></div>
       <div class="body"><h3>${esc(p.title || 'Untitled prototype')}</h3>
         <p class="status">${busy[p.id] ? 'Generating directions…' : (p.directions.length ? p.directions.length + ' directions' : 'Not generated')}</p></div>
     </div>`).join('');
@@ -250,7 +229,7 @@ $('scrim').onclick = (e) => { if (e.target === $('scrim')) closeModal(); };
 $('mGo').onclick = async () => {
   const brief = { briefUrl: $('mSpec').value.trim(), briefContent: $('mText').value.trim(), device: $('mDevice').value };
   if (!brief.briefUrl && !brief.briefContent) { $('mErr').textContent = 'Add a spec sheet link or paste the brief.'; return; }
-  const p = { id: 'p' + Date.now(), title: '', brief, directions: [], lead: 0, prototype: null, comments: [], versions: [] };
+  const p = { id: 'p' + Date.now(), title: '', brief, directions: [] };
   db.prototypes.unshift(p); save();
   closeModal();
   openProto(p.id);
@@ -271,7 +250,7 @@ $('mGo').onclick = async () => {
   busy[p.id] = false;
   const failed = p.directions.filter(d => d.failed).length;
   save();
-  status(failed ? failed + ' direction' + (failed > 1 ? 's' : '') + ' did not finish. Use Retry in the screens view.' : 'Directions ready', failed > 0);
+  status(failed ? failed + ' direction' + (failed > 1 ? 's' : '') + ' did not finish. Use Retry under that direction.' : 'Directions ready', failed > 0);
   render();
 };
 
@@ -331,18 +310,10 @@ async function retryDirection(p, i) {
 // The page calls the Pipedream trigger directly, the same way the design-system editor calls
 // GitHub. The trigger URL and token are kept in this browser only (localStorage).
 const SETTINGS_KEY = 'tds-protostudio-settings';
-const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'selectedOption', 'selectedDirections', 'direction', 'screenComments', 'generalComment', 'screenIndexes', 'referenceScreens'];
+const FLOW_FIELDS = ['mode', 'briefUrl', 'briefContent', 'briefTitle', 'selectedOption', 'screenIndexes', 'referenceScreens'];
 const TDS_CSS = 'https://richardcollins-pixel.github.io/thoughtful-design-system/tds/tds.css';
 
 function settings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (_) { return {}; } }
-
-// Flow output is either flat (directions) or wrapped as {output: {screens}} (build, iterate).
-function normalize(result) {
-  if (result && result.output && typeof result.output === 'object') {
-    return { ...result.output, mode: result.mode, featureTitle: result.featureTitle };
-  }
-  return result;
-}
 
 async function post(url, token, agentInput) {
   const headers = { 'Content-Type': 'application/json' };
@@ -370,7 +341,7 @@ async function call(payload, label, opts = {}) {
     const first = await post(s.triggerUrl, s.token, agentInput);
     let result = first.data;
     if (first.status === 202 && first.data.jobId) {
-      // Directions, build and iterate return a job id; poll the flow's get-job mode until it finishes.
+      // Directions and wireframes return a job id; poll the flow's get-job mode until it finishes.
       const deadline = Date.now() + 15 * 60 * 1000;   // longer than a Pipedream step can run
       result = null;
       // Each status check is a separate Pipedream run, so check slowly: 10s, backing off to 30s.
@@ -385,7 +356,7 @@ async function call(payload, label, opts = {}) {
       if (!result) throw new Error('job did not finish in 15 minutes');
     }
     clearInterval(timer);
-    return normalize(result);
+    return result;
   } catch (e) {
     clearInterval(timer);
     lastCallError = e.message;
@@ -466,385 +437,169 @@ async function openShared() {
     const meta = await read('meta');
     const directions = [];
     for (let i = 0; i < meta.directionCount; i++) directions.push(await read('direction-' + i));
-    const p = { id: 'p' + Date.now(), shareId: projectId, title: meta.title, brief: meta.brief,
-      directions, lead: 0, prototype: null, comments: [], versions: [] };
+    const p = { id: 'p' + Date.now(), shareId: projectId, title: meta.title, brief: meta.brief, directions };
     db.prototypes.unshift(p); save(); openProto(p.id); status('Opened shared prototype');
   } catch (e) { status('Could not open that link: ' + e.message, true); }
 }
 
 // ── workspace ────────────────────────────────────────────────────────────────
+let fittedFor = null;   // the prototype whose canvas has been fitted to the window
 function openProto(id) {
   current = id;
-  const p = cur();
-  if (!p.view) p.view = {};
-  target = null;
-  shown = { tab: 'screens', index: 0, dir: null };
+  fittedFor = null;
   render();
-}
-
-// The screens on show: the synthesized prototype if there is one, otherwise the lead direction.
-// What the centre shows: the prototype once it exists; otherwise the direction being viewed (the lead by default).
-function sourceScreens(p) {
-  if (p.prototype) return { name: 'Prototype', screens: p.prototype.screens, index: -1 };
-  const i = shown.dir ?? p.lead;
-  const d = p.directions[i];
-  return d ? { name: d.name, screens: d.screens || [], index: i } : { name: '', screens: [], index: -1 };
 }
 
 function render() {
   if (!current || !cur()) { renderLibrary(); return; }
   const p = cur();
   $('library').style.display = 'none';
-  $('ws').style.display = 'grid';
+  $('ws').style.display = 'block';
   $('back').style.display = '';
-  $('back').onclick = () => { current = null; target = null; render(); };
+  $('back').onclick = () => { current = null; render(); };
   $('brand').style.display = 'none';
   $('projectBar').style.display = 'flex';
   $('projName').value = p.title || '';
   $('projName').onchange = () => { p.title = $('projName').value.trim() || 'Untitled prototype'; save(); };
   $('projDelete').onclick = () => deleteProto(p);
-  // Stage one: directions on the left. Once there is a prototype, the left shows its history instead.
-  if (p.prototype) renderHistory(p); else renderLeft(p);
-  renderCenter(p);
-  renderRight(p);
-}
-
-function renderLeft(p) {
-  const viewing = shown.dir ?? p.lead;
-  if (!p.directions.length) {
-    // Skeleton while the directions are being written.
-    $('left').innerHTML = `<h4>Directions</h4>
-      <div class="hint">Writing three directions for this brief.</div>
-      ${[0, 1, 2].map(() => '<div class="dir"><div class="skel-bar" style="width:70%"></div><div class="skel-bar" style="width:100%;margin-top:8px"></div><div class="skel-bar" style="width:85%;margin-top:6px"></div></div>').join('')}`;
-    return;
-  }
-  const dirs = p.directions.map((d, i) => `
-    <div class="dir ${i === viewing ? 'active' : ''}" data-dir="${i}">
-      <h5>${esc(d.name || 'Direction ' + (i + 1))}</h5>
-      <p>${esc(d.description || '')}</p>
-      <label class="opts" style="cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;margin-top:8px"><input type="radio" name="lead" data-lead="${i}" ${i === p.lead ? 'checked' : ''}> Lead direction</label>
-    </div>`).join('');
-  $('left').innerHTML = `<h4>Directions</h4>
-    <div class="hint">Pick a lead direction. Click any direction to view it, then comment on screens or elements from other directions to bring them in.</div>
-    ${dirs}`;
-  $('left').querySelectorAll('[data-lead]').forEach(r => r.onchange = () => { p.lead = Number(r.dataset.lead); save(); render(); });
-  $('left').querySelectorAll('[data-dir]').forEach(el => el.onclick = (e) => {
-    if (e.target.closest('input')) return;
-    shown = { ...shown, dir: Number(el.dataset.dir), index: 0 };
-    target = null; render();
-  });
-}
-
-function renderHistory(p) {
-  const history = (p.versions || []).map((v, i) => `<div class="c">
-      <div class="where">${esc(new Date(v.at).toLocaleTimeString())}</div>${esc(v.label)}
-      <div style="margin-top:4px">${i === 0 ? '<span class="chip">current</span>' : `<button data-restore="${i}">Restore</button>`}</div></div>`).join('');
-  $('left').innerHTML = `<h4>History</h4>
-    <div class="hint">Every change is saved. Restore any version.</div>
-    ${history || '<div class="chip">No versions yet</div>'}`;
-  $('left').querySelectorAll('[data-restore]').forEach(b => b.onclick = () => restoreVersion(p, Number(b.dataset.restore)));
-}
-
-// Frame sizes for the screens row: each screen is drawn at this width and scaled to fit.
-const CARD = {
-  mobile:  { w: 260, h: 583, scale: 260 / 390 },
-  desktop: { w: 832, h: 520, scale: 520 / 800 },   // 520px tall, same 1280 × 800 proportions
-};
-
-function screenCard(s, forced, dirDevice) {
-  // Priority: a manual choice, then the device the content designer chose for the direction, then the screen's own.
-  const dev = forced || dirDevice || (s.device === 'desktop' ? 'desktop' : 'mobile');
-  const c = CARD[dev];
-  const body = s.html
-    ? `<div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${c.w}px;height:${c.h}px">${frame(s, dev, c.scale)}</div>`
-    : `<div class="skel" style="width:${c.w}px;height:${c.h}px"></div>`;
-  return `<div class="screen-card" style="width:${c.w}px">
-      ${body}
-      <div class="label">${esc(s.name || 'Screen')}</div>
-      <div class="purpose">${esc(s.description || s.purpose || '')}</div></div>`;
-}
-
-function skeletonDirection(dev) {
-  const c = CARD[dev];
-  const cards = [0, 1, 2].map(() => `<div class="screen-card">
-      <div class="skel-bar" style="width:120px"></div>
-      <div class="skel" style="width:${c.w}px;height:${c.h}px;margin-top:6px"></div>
-      <div class="skel-bar" style="width:200px;margin-top:8px"></div></div>`).join('');
-  return `<div class="dirblock"><div class="skel-bar" style="width:200px;height:14px"></div>
-    <div class="skel-bar" style="width:320px;margin-top:8px"></div>
-    <div class="screen-row">${cards}</div></div>`;
-}
-
-function renderCenter(p) {
-  // The device chosen when the prototype was started. Older prototypes without one show mobile.
-  const forced = p.brief?.device === 'desktop' ? 'desktop' : 'mobile';
-  const dev = forced;
-  const size = SIZES[dev];
-  const toolbar = `<div class="toolbar">
-      <span class="size">${size.label} · ${size.w} × ${size.h}</span>
-      <div class="tabs"><button data-tab="screens" class="${shown.tab === 'screens' ? 'on' : ''}">Screens</button><button data-tab="prototype" class="${shown.tab === 'prototype' ? 'on' : ''}">Prototype</button></div>
-    </div>`;
-
-  let body;
-  if (!p.directions.length) {
-    // Skeleton until the directions copy arrives.
-    body = [0, 1, 2].map(() => skeletonDirection(dev)).join('');
-  } else if (shown.tab === 'screens' && synthesizing === p.id && !p.prototype) {
-    // Synthesis in progress: show the flow being built, not the direction being viewed.
-    const lead = p.directions[p.lead];
-    body = `<div class="dirhead"><h3>Synthesizing ${esc(lead?.name || '')}</h3><p>Building one flow from the lead and the comments on every direction.</p></div>
-      <div class="screen-row">${[0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('')}</div>`;
-  } else if (shown.tab === 'screens') {
-    const src = sourceScreens(p);
-    const head = p.prototype
-      ? `<div class="dirhead"><h3>Prototype</h3><p>${src.screens.length} screens</p></div>`
-      : `<div class="dirhead"><h3>${esc(src.name)}</h3><p>${esc(p.directions[src.index]?.description || '')}</p></div>`;
-    const cards = src.screens.length
-      ? src.screens.map(s => screenCard(s, forced, p.prototype ? null : p.directions[src.index]?.device)).join('')
-      : [0, 1, 2].map(() => `<div class="screen-card"><div class="skel" style="width:${CARD[dev].w}px;height:${CARD[dev].h}px"></div></div>`).join('');
-    const failedDir = !p.prototype && p.directions[src.index]?.failed;
-    const retryNote = failedDir
-      ? `<div class="busy">Some screens did not finish${p.directions[src.index]?.error ? ': ' + esc(p.directions[src.index].error) : ''}. <button data-retry="${src.index}">Retry</button></div>`
-      : '';
-    body = `${head}<div class="screen-row">${cards}</div>${retryNote}`;
-  } else {
-    const src = sourceScreens(p);
-    const screens = src.screens;
-    if (!screens.length) { body = '<div class="busy">Designing screens…</div>'; }
-    else {
-      shown.index = Math.min(Math.max(shown.index, 0), screens.length - 1);
-      const s = screens[shown.index];
-      const sd = forced || (s.device === 'desktop' ? 'desktop' : 'mobile');
-      const ss = SIZES[sd];
-      body = `<div class="name">${esc(src.name)} · ${esc(s.name || 'Screen')}</div>
-        <div class="frame ${target && target.screenId === s.id ? 'target' : ''}" style="width:${ss.w * ss.scale}px;height:${ss.h * ss.scale}px">${s.html ? frame(s, sd, ss.scale) : ''}</div>
-        <div class="pager"><button data-prev>←</button><span>${shown.index + 1} / ${screens.length}</span><button data-next>→</button></div>`;
-    }
-  }
-  $('center').innerHTML = toolbar + `<div class="stage">${body}</div>`;
-  $('center').querySelectorAll('[data-retry]').forEach(b => b.onclick = () => retryDirection(p, Number(b.dataset.retry)));
-  $('center').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shown.tab = b.dataset.tab; render(); });
-  const prev = $('center').querySelector('[data-prev]'), next = $('center').querySelector('[data-next]');
-  const count = sourceScreens(p).screens.length;
-  if (prev) prev.onclick = () => { shown.index = Math.max(0, shown.index - 1); render(); };
-  if (next) next.onclick = () => { shown.index = Math.min(count - 1, shown.index + 1); render(); };
-}
-
-function frame(screen, device, scale) {
-  const size = SIZES[device];
-  return `<iframe sandbox="allow-scripts" style="width:${size.w}px;height:${size.h}px;transform:scale(${scale})" srcdoc="${esc(srcdoc(screen))}"></iframe>`;
-}
-
-// Screens arrive as full HTML documents. Add the design-system stylesheet and the click
-// handler to them; if a screen is only a fragment, wrap it in a page first.
-function srcdoc(screen) {
-  // Relative image and font paths in the design system resolve against the design system's own site.
-  const head = `<base href="https://richardcollins-pixel.github.io/thoughtful-design-system/tds/">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="${TDS_CSS}">
-<style>
-  html,body{margin:0;min-height:100%}
-  [data-el]{cursor:pointer}
-  .wa-hover{outline:1px dashed #0d99ff!important;outline-offset:2px}
-  .wa-sel{outline:2px solid #0d99ff!important;outline-offset:2px}
-</style>`;
-  const html = screen.html || '';
-  // Charcoal (wireframe) fidelity, the same switch the editor's Charcoal toggle sets on its canvas:
-  // accent colours and imagery drop out and gradients flatten, so screens read as wireframes.
-  const fidelity = 'data-fidelity="wireframe"';
-  const isDoc = /<html[\s>]/i.test(html);
-  const body = isDoc
-    ? html.replace(/<html([^>]*)>/i, (m, attrs) => `<html${attrs} ${fidelity}>`)
-        .replace(/<head[^>]*>/i, m => m + head).replace(/<\/body>/i, '<!--wa-->')
-    : `<!doctype html><html ${fidelity}><head><meta charset="utf-8">${head}</head><body>${html}<!--wa--></body></html>`;
-  return body.replace('<!--wa-->', clickScript(screen.id));
-}
-
-function clickScript(screenId) {
-  return `<script>
-  const SCREEN_ID = ${JSON.stringify(screenId)};
-  let hover = null;
-  document.addEventListener('mouseover', (e) => {
-    const el = e.target.closest('[data-el]');
-    if (hover === el) return;
-    if (hover) hover.classList.remove('wa-hover');
-    if (el) el.classList.add('wa-hover');
-    hover = el;
-  });
-  document.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    const el = e.target.closest('[data-el]');
-    document.querySelectorAll('.wa-sel').forEach(n => n.classList.remove('wa-sel'));
-    if (el) el.classList.add('wa-sel');
-    parent.postMessage({ type: 'wa-target', screenId: SCREEN_ID,
-      elementId: el ? el.dataset.el : '', tag: el ? el.tagName.toLowerCase() : '',
-      text: el ? (el.textContent || '').trim().slice(0, 160) : '' }, '*');
-  }, true);
-  window.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'wa-clear') document.querySelectorAll('.wa-sel').forEach(n => n.classList.remove('wa-sel'));
-  });
-<\/script>
-<script type="module">
-  // The blob (T) is drawn by the design system's behaviors/blob.js. The editor loads it when a page has a .blob or .glow;
-  // a screen's iframe loads only the stylesheet, so the blob stayed an empty canvas. Load it the same way, when needed.
-  // It sizes its canvas and places the glow from the page's layout when it starts, so wait until the stylesheet has applied.
-  // A module script does not wait for the stylesheet, and an unstyled canvas measures 300 × 150.
-  window.addEventListener('load', () => { if (document.querySelector('.blob, .glow')) import('./behaviors/blob.js'); });
-<\/script>`;
-}
-
-window.addEventListener('message', (e) => {
-  const m = e.data;
-  if (!m || m.type !== 'wa-target' || !cur()) return;
-  const p = cur();
-  const src = sourceScreens(p);
-  const screen = src.screens.find(s => s.id === m.screenId);
-  if (!screen) return;
-  target = {
-    level: m.elementId ? 'element' : 'screen',
-    screenId: screen.id, screenName: screen.name || '', directionName: src.name, directionIndex: src.index,
-    elementId: m.elementId || '', elementTag: m.tag || '', elementText: m.text || '',
-  };
-  renderRight(p);
-});
-
-// Clears the selection inside every screen and in the comment panel.
-function clearFrames() {
-  document.querySelectorAll('#center iframe').forEach(f => { if (f.contentWindow) f.contentWindow.postMessage({ type: 'wa-clear' }, '*'); });
-}
-
-// Clicking the empty canvas (not a screen, not a control) deselects.
-$('center').addEventListener('click', (e) => {
-  if (e.target.closest('iframe, button, select, input, textarea, label')) return;
-  if (!target) return;
-  target = null; clearFrames();
-  if (cur()) renderRight(cur());
-});
-
-// Saves a comment. With no target selected, it applies to the direction being viewed, or the whole flow.
-function addComment(p, text) {
-  const src = sourceScreens(p);
-  p.comments.push({ ...(target || { level: 'prototype', screenName: '', screenId: '', directionName: src.name, directionIndex: src.index }), comment: text });
-  target = null; save(); clearFrames();
-}
-
-function renderRight(p) {
-  const t = target;
-  const targetText = !t ? 'Nothing selected'
-    : t.level === 'element' ? 'data-el: ' + t.elementId
-    : 'Screen: ' + t.screenName;
-  const list = p.comments.length
-    ? p.comments.map((c, i) => `<div class="c"><button data-remove="${i}">×</button>
-        <div class="where">${esc(c.directionName || '')} · ${esc(c.screenName || '')}${c.elementId ? ' · data-el ' + esc(c.elementId) : ''}</div>${esc(c.comment)}</div>`).join('')
-    : '<div class="chip">Click a screen or element, then say what to keep or change.</div>';
-  const stage1 = !p.prototype;
-  const n = p.comments.length;
-  const plural = n > 1 ? 's' : '';
-  const label = 'Synthesize';
-  const enabled = p.directions.length > 0 && !busy[p.id] && (stage1 || n > 0);
-  $('right').innerHTML = `
-    <h4>Comments</h4>
-    <div class="target-row"><span>Lead direction</span><span class="chip"><b>${esc(p.directions[p.lead]?.name || '—')}</b></span></div>
-    <div class="target-row"><span>Target</span><span class="chip">${esc(targetText)}</span></div>
-    <textarea class="ask" id="ask" placeholder="What should change here, or what to bring in from this direction?"></textarea>
-    <div style="display:flex;gap:6px"><button id="addC" style="flex:1">Add comment</button>
-      ${t ? '<button id="clearT">Clear</button>' : ''}</div>
-    <div class="comments">${list}</div>
-    <button class="dark go" id="synth" ${enabled ? '' : 'disabled'}>${label}</button>`;
-  $('addC').onclick = () => {
-    const text = $('ask').value.trim();
-    if (!text) return;
-    addComment(p, text);
-    $('ask').value = ''; renderRight(p);
-  };
-  if ($('clearT')) $('clearT').onclick = () => { target = null; render(); };
-  $('right').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { p.comments.splice(Number(b.dataset.remove), 1); save(); render(); });
-  // Synthesize saves any comment still in the box first, so nothing typed is lost.
-  $('synth').onclick = () => {
-    const text = $('ask').value.trim();
-    if (text) { addComment(p, text); $('ask').value = ''; }
-    synthesize(p);
-  };
+  renderCanvas(p);
 }
 
 function deleteProto(p) {
   if (busy[p.id]) { status('Wait for the current generation to finish, then delete.', true); return; }
   if (!confirm('Delete "' + (p.title || 'Untitled prototype') + '"? This cannot be undone.')) return;
   db.prototypes = db.prototypes.filter(x => x.id !== p.id);
-  current = null; target = null;
+  current = null;
   save(); status('Project deleted'); render();
 }
 
-// Every change is recorded, newest first, so any version can be restored.
-function recordVersion(p, label, screens) {
-  const list = screens || p.prototype.screens;
-  p.versions = [{ at: new Date().toISOString(), label, screens: JSON.parse(JSON.stringify(list)) }, ...(p.versions || [])].slice(0, 50);
+// ── canvas ───────────────────────────────────────────────────────────────────
+// Every direction is one row on the same surface, with its screens side by side at their real size.
+// Zoom: ⌘/Ctrl + scroll (or pinch), or the buttons. Pan: scroll, or drag the background.
+let view = { x: 40, y: 40, z: 0.5 };
+const ZOOM_MIN = 0.1, ZOOM_MAX = 2;
+
+function applyView() {
+  $('world').style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`;
+  $('zLevel').textContent = Math.round(view.z * 100) + '%';
 }
 
-function restoreVersion(p, i) {
-  const v = p.versions[i];
-  if (!v) return;
-  p.prototype = { name: 'Prototype', screens: JSON.parse(JSON.stringify(v.screens)) };
-  recordVersion(p, 'Restored: ' + v.label);
-  p.comments = []; target = null; shown = { ...shown, index: 0 }; save(); status('Restored an earlier version'); render();
+// Zooms around a point in the viewport, so the spot under the cursor stays put.
+function zoomAt(mx, my, nz) {
+  nz = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, nz));
+  view.x = mx - (mx - view.x) * (nz / view.z);
+  view.y = my - (my - view.y) * (nz / view.z);
+  view.z = nz;
+  applyView();
 }
 
-// Comments on a screen or element go to the flow as screen comments. Comments with no target apply to the whole flow.
-function splitComments(p) {
-  const screenComments = p.comments.filter(c => c.level !== 'prototype').map(c => ({
-    directionName: c.directionName || '', screenName: c.screenName || '',
-    elementId: c.elementId || '', elementTag: c.elementTag || 'div', elementText: c.elementText || '',
-    elementClasses: [], comment: c.comment,
-  }));
-  // A general comment belongs to the direction it was made on. On another direction it is a suggestion to bring in.
-  const generalComment = p.comments.filter(c => c.level === 'prototype').map(c => {
-    const otherDirection = !p.prototype && Number.isInteger(c.directionIndex) && c.directionIndex >= 0 && c.directionIndex !== p.lead;
-    return otherDirection ? 'From "' + c.directionName + '": ' + c.comment : c.comment;
-  }).join('\n');
-  return { screenComments, generalComment };
+function viewportCenter() {
+  const vp = $('vp');
+  return { x: vp.clientWidth / 2, y: vp.clientHeight / 2 };
 }
 
-async function synthesize(p) {
-  const { screenComments, generalComment } = splitComments(p);
-  const hasComments = screenComments.length > 0 || !!generalComment;
+// Shows all the content at a zoom that fits the window.
+function fitView() {
+  const vp = $('vp'), world = $('world');
+  if (!world.offsetWidth || !world.offsetHeight) return;
+  const pad = 40;
+  const z = Math.min(1, (vp.clientWidth - pad * 2) / world.offsetWidth, (vp.clientHeight - pad * 2) / world.offsetHeight);
+  view = { x: pad, y: pad, z: Math.max(ZOOM_MIN, z) };
+  applyView();
+}
 
-  // Stage one: the lead direction, plus any other directions the comments bring in, become one prototype.
-  if (!p.prototype) {
-    const lead = p.directions[p.lead];
-    if (!lead) return;
-    if (!hasComments) {
-      p.prototype = { name: 'Prototype', screens: lead.screens || [] };
-      recordVersion(p, 'From ' + (lead.name || 'lead direction'));
-      shown = { ...shown, index: 0 }; save(); status('Prototype ready. Comment on a screen to change it.'); render();
-      return;
-    }
-    const others = [...new Set(p.comments.map(c => c.directionIndex))]
-      .filter(i => Number.isInteger(i) && i >= 0 && i !== p.lead);
-    const picked = [lead, ...others.map(i => p.directions[i])];
-    recordVersion(p, 'From ' + (lead.name || 'lead direction'), lead.screens || []);
-    busy[p.id] = true; synthesizing = p.id; render();
-    const data = await call({ mode: 'build', ...p.brief, selectedDirections: picked, screenComments, generalComment },
-      'Building prototype');
-    busy[p.id] = false; synthesizing = null;
-    if (!data) { render(); return; }
-    p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
-    recordVersion(p, 'Built from ' + picked.length + ' direction' + (picked.length > 1 ? 's' : ''));
-    p.comments = []; target = null; shown = { ...shown, index: 0, tab: 'screens', dir: null };
-    save(); status('Prototype ready'); render();
-    return;
+function renderCanvas(p) {
+  const dev = deviceOf(p);
+  const size = SIZES[dev];
+  const rows = (p.directions || []).map((d, i) => {
+    const cards = (d.screens || []).map(s => screenCard(s, size)).join('');
+    const note = d.failed
+      ? `<div class="busy">Some screens did not finish${d.error ? ': ' + esc(d.error) : ''}. <button data-retry="${i}">Retry</button></div>`
+      : '';
+    return `<section class="row">
+      <div class="row-head"><h3>${esc(d.name || 'Direction ' + (i + 1))}</h3><p>${esc(d.description || '')}</p>${note}</div>
+      <div class="row-screens">${cards}</div>
+    </section>`;
+  }).join('');
+  const empty = p.directions.length ? '' : `<div class="busy" style="padding:40px">${busy[p.id] ? 'Writing directions…' : 'No directions yet.'}</div>`;
+  $('world').innerHTML = empty + rows;
+  $('world').querySelectorAll('[data-retry]').forEach(b => b.onclick = () => retryDirection(p, Number(b.dataset.retry)));
+
+  // Fit the canvas to the window the first time a prototype's content appears.
+  if (fittedFor !== p.id && p.directions.length) { fitView(); fittedFor = p.id; }
+  else applyView();
+}
+
+function screenCard(s, size) {
+  const body = s.html
+    ? `<div class="frame" style="width:${size.w}px;height:${size.h}px"><iframe sandbox="allow-scripts" style="width:${size.w}px;height:${size.h}px" srcdoc="${esc(srcdoc(s))}"></iframe><div class="shield"></div></div>`
+    : `<div class="skel" style="width:${size.w}px;height:${size.h}px"></div>`;
+  return `<div class="screen" style="width:${size.w}px">
+      ${body}
+      <div class="label">${esc(s.name || 'Screen')}</div>
+      <div class="purpose">${esc(s.description || s.purpose || '')}</div></div>`;
+}
+
+// Wheel: scroll pans, ⌘/Ctrl + wheel (or a trackpad pinch) zooms.
+$('vp').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) {
+    const r = $('vp').getBoundingClientRect();
+    zoomAt(e.clientX - r.left, e.clientY - r.top, view.z * Math.exp(-e.deltaY * 0.01));
+  } else {
+    view.x -= e.deltaX; view.y -= e.deltaY; applyView();
   }
+}, { passive: false });
 
-  // Stage two: targeted changes. Each screen or element comment names one screen; a whole-flow comment changes what it names.
-  if (!hasComments) return;
-  busy[p.id] = true; render();
-  const data = await call({ mode: 'iterate', ...p.brief, direction: p.prototype, screenComments, generalComment }, 'Applying changes');
-  busy[p.id] = false;
-  if (!data) { render(); return; }
-  p.prototype = { name: 'Prototype', screens: (data.screens || []).map(withName) };
-  recordVersion(p, p.comments.length + ' change' + (p.comments.length > 1 ? 's' : ''));
-  p.comments = []; target = null; shown = { ...shown, tab: 'screens' };
-  save(); status('Changes applied'); render();
+// Drag the background to pan.
+let drag = null;
+$('vp').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+  $('vp').classList.add('dragging');
+  $('vp').setPointerCapture(e.pointerId);
+});
+$('vp').addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  view.x = drag.vx + (e.clientX - drag.x);
+  view.y = drag.vy + (e.clientY - drag.y);
+  applyView();
+});
+const endDrag = () => { drag = null; $('vp').classList.remove('dragging'); };
+$('vp').addEventListener('pointerup', endDrag);
+$('vp').addEventListener('pointercancel', endDrag);
+
+$('zIn').onclick = () => { const c = viewportCenter(); zoomAt(c.x, c.y, view.z * 1.25); };
+$('zOut').onclick = () => { const c = viewportCenter(); zoomAt(c.x, c.y, view.z / 1.25); };
+$('zLevel').onclick = () => { const c = viewportCenter(); zoomAt(c.x, c.y, 1); };
+$('zFit').onclick = fitView;
+
+// ── screen HTML ──────────────────────────────────────────────────────────────
+// Screens arrive as full HTML documents. Add the design-system stylesheet to them; if a screen is only
+// a fragment, wrap it in a page first.
+function srcdoc(screen) {
+  // Relative image and font paths in the design system resolve against the design system's own site.
+  const head = `<base href="https://richardcollins-pixel.github.io/thoughtful-design-system/tds/">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="${TDS_CSS}">
+<style>html,body{margin:0;min-height:100%}</style>`;
+  const html = screen.html || '';
+  // Charcoal (wireframe) fidelity: accent colours and imagery drop out and gradients flatten, so screens read as wireframes.
+  const fidelity = 'data-fidelity="wireframe"';
+  const isDoc = /<html[\s>]/i.test(html);
+  const body = isDoc
+    ? html.replace(/<html([^>]*)>/i, (m, attrs) => `<html${attrs} ${fidelity}>`)
+        .replace(/<head[^>]*>/i, m => m + head).replace(/<\/body>/i, '<!--wa-->')
+    : `<!doctype html><html ${fidelity}><head><meta charset="utf-8">${head}</head><body>${html}<!--wa--></body></html>`;
+  return body.replace('<!--wa-->', BLOB_SCRIPT);
 }
+
+// The blob (T) is drawn by the design system's behaviors/blob.js. It sizes its canvas and places the glow from
+// the page's layout when it starts, so it waits for the window's load event, after the stylesheet has applied.
+// A module script does not wait for the stylesheet, and an unstyled canvas measures 300 × 150.
+const BLOB_SCRIPT = `<script type="module">
+  window.addEventListener('load', () => { if (document.querySelector('.blob, .glow')) import('./behaviors/blob.js'); });
+<\/script>`;
 
 load().then(() => { render(); openShared(); });
 </script>
