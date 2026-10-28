@@ -298,8 +298,9 @@ async function designDirection(p, d, onlyFailed = false) {
     if (out && out.screens) {
       indexes.forEach((i, k) => {
         const got = out.screens[k];
+        // The device the user chose is the device of every screen, whatever the model wrote.
         d.screens[i] = got
-          ? { ...got, id: outline[i].id || got.id, name: outline[i].name, failed: false }
+          ? { ...got, id: outline[i].id || got.id, name: outline[i].name, device: p.brief?.device || got.device, failed: false }
           : { ...outline[i], failed: true };
       });
     } else {
@@ -658,7 +659,9 @@ function clickScript(screenId) {
 <script type="module">
   // The blob (T) is drawn by the design system's behaviors/blob.js. The editor loads it when a page has a .blob or .glow;
   // a screen's iframe loads only the stylesheet, so the blob stayed an empty canvas. Load it the same way, when needed.
-  if (document.querySelector('.blob, .glow')) import('./behaviors/blob.js');
+  // It sizes its canvas and places the glow from the page's layout when it starts, so wait until the stylesheet has applied.
+  // A module script does not wait for the stylesheet, and an unstyled canvas measures 300 × 150.
+  window.addEventListener('load', () => { if (document.querySelector('.blob, .glow')) import('./behaviors/blob.js'); });
 <\/script>`;
 }
 
