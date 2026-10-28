@@ -65,7 +65,10 @@
   .screen .purpose { color: var(--mute); font-size: 13px; line-height: 1.4; }
   .frame { position: relative; background: #fff; border-radius: 22px; border: 1px solid var(--line); overflow: hidden; box-shadow: 0 6px 24px rgb(0 0 0 / .06); }
   .frame iframe { border: 0; display: block; background: #fff; }
-  .skel, .skel-bar { background: linear-gradient(90deg, #ececef 0%, #f6f6f8 50%, #ececef 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 8px; }
+  .skel, .skel-bar { background: linear-gradient(90deg, #050505 0%, #171717 50%, #050505 100%); background-size: 200% 100%; animation: shimmer 1.8s infinite; border-radius: 8px; }
+  /* covers a screen until its blob has loaded; fades out once the screen reports ready */
+  .frame .cover { position: absolute; inset: 0; background: linear-gradient(90deg, #050505 0%, #171717 50%, #050505 100%); background-size: 200% 100%; animation: shimmer 1.8s infinite; transition: opacity 0.3s; }
+  .frame.ready .cover { opacity: 0; pointer-events: none; }
   .skel-bar { height: 10px; }
   .skel { border-radius: 22px; }
   @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
@@ -554,7 +557,7 @@ function renderCanvas(p) {
 
 function screenCard(s, size) {
   const body = s.html
-    ? `<div class="frame" style="width:${size.w}px;height:${size.h}px"><iframe sandbox="allow-scripts" style="width:${size.w}px;height:${size.h}px" srcdoc="${esc(srcdoc(s))}"></iframe></div>`
+    ? `<div class="frame" data-sid="${esc(s.id)}" style="width:${size.w}px;height:${size.h}px"><iframe sandbox="allow-scripts" style="width:${size.w}px;height:${size.h}px" srcdoc="${esc(srcdoc(s))}"></iframe><div class="cover"></div></div>`
     : `<div class="skel" style="width:${size.w}px;height:${size.h}px"></div>`;
   return `<div class="screen" style="width:${size.w}px">
       ${body}
@@ -613,15 +616,33 @@ function srcdoc(screen) {
     ? html.replace(/<html([^>]*)>/i, (m, attrs) => `<html${attrs} ${fidelity}>`)
         .replace(/<head[^>]*>/i, m => m + head).replace(/<\/body>/i, '<!--wa-->')
     : `<!doctype html><html ${fidelity}><head><meta charset="utf-8">${head}</head><body>${html}<!--wa--></body></html>`;
-  return body.replace('<!--wa-->', BLOB_SCRIPT);
+  return body.replace('<!--wa-->', readyScript(screen.id));
 }
 
 // The blob (T) is drawn by the design system's behaviors/blob.js. It sizes its canvas and places the glow from
 // the page's layout when it starts, so it waits for the window's load event, after the stylesheet has applied.
 // A module script does not wait for the stylesheet, and an unstyled canvas measures 300 × 150.
-const BLOB_SCRIPT = `<script type="module">
-  window.addEventListener('load', () => { if (document.querySelector('.blob, .glow')) import('./behaviors/blob.js'); });
+function readyScript(screenId) {
+  return `<script type="module">
+  const SCREEN_ID = ${JSON.stringify(screenId)};
+  let sent = false;
+  const ready = () => { if (!sent) { sent = true; parent.postMessage({ type: 'wa-ready', screenId: SCREEN_ID }, '*'); } };
+  setTimeout(ready, 4000);
+  window.addEventListener('load', async () => {
+    if (document.querySelector('.blob, .glow')) {
+      try { await import('./behaviors/blob.js'); } catch (e) {}
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    }
+    ready();
+  });
 <\/script>`;
+}
+
+// Uncover a screen once it reports ready.
+window.addEventListener('message', (e) => {
+  if (!e.data || e.data.type !== 'wa-ready') return;
+  document.querySelectorAll('.frame[data-sid]').forEach(f => { if (f.dataset.sid === e.data.screenId) f.classList.add('ready'); });
+});
 
 load().then(() => { render(); openShared(); });
 </script>
