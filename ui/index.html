@@ -410,39 +410,64 @@ $('setSave').onclick = () => {
 };
 
 // ── sharing ──────────────────────────────────────────────────────────────────
-// Share saves the open prototype to the flow's data store and copies a link with ?p=<id>.
-// Opening that link loads the prototype from the flow. Each share overwrites the same saved copy.
-$('shareBtn').onclick = async () => {
+// A project is saved to the public wireframe-projects repo as separate files: meta.json, then one
+// direction-<n>.json per direction. Each part is its own request to the flow, so none is too big to send.
+// Share saves the open prototype, then copies a link with ?p=<id>. Opening the link reads the files from GitHub.
+const PROJECTS_RAW = 'https://raw.githubusercontent.com/richardcollins-pixel/wireframe-projects/main/projects/';
+const newProjectId = () => 'proj_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+// Sends one part of a project to the flow. Parts go one at a time, so a failure names the part.
+async function savePart(s, projectId, part, index, data) {
+  const { data: res } = await post(s.triggerUrl, s.token, { mode: 'save-project-part', projectId, part, index, data });
+  if (!res.saved) throw new Error((res.error || 'no confirmation') + ' (' + part + (index != null ? ' ' + (index + 1) : '') + ')');
+}
+
+// Saves the whole open prototype, meta first, then each direction.
+async function saveProject(p) {
   const s = settings();
-  if (!s.triggerUrl) { openSettings(); status('Add the trigger URL in Settings first.', true); return; }
+  if (!s.triggerUrl) { openSettings(); throw new Error('add the trigger URL in Settings first'); }
+  const projectId = p.shareId || newProjectId();
+  const dirs = p.directions || [];
+  const total = dirs.length + 1;
+  const meta = { title: p.title || '', brief: p.brief || {}, directionCount: dirs.length, savedAt: new Date().toISOString() };
+  status('Saving 1 of ' + total + '…');
+  await savePart(s, projectId, 'meta', null, meta);
+  for (let i = 0; i < dirs.length; i++) {
+    status('Saving ' + (i + 2) + ' of ' + total + '…');
+    await savePart(s, projectId, 'direction', i, dirs[i]);
+  }
+  p.shareId = projectId; save();
+  return projectId;
+}
+
+$('shareBtn').onclick = async () => {
   const p = cur();
-  // Only the prototype is shared, not its version history: each version holds its own copy of every screen.
-  const { versions, view, shareId, ...shared } = p;
-  const sizeKb = Math.round(JSON.stringify(shared).length / 1024);
-  status('Saving link… (' + sizeKb + ' KB)');
   try {
-    const { data } = await post(s.triggerUrl, s.token, { mode: 'save-project', projectId: shareId || '', project: shared });
-    if (!data.projectId) throw new Error(data.error || 'no link came back');
-    p.shareId = data.projectId; save();
-    const url = location.origin + location.pathname + '?p=' + p.shareId;
+    const projectId = await saveProject(p);
+    const url = location.origin + location.pathname + '?p=' + projectId;
     await navigator.clipboard.writeText(url).catch(() => {});
     status('Link copied: ' + url);
-  } catch (e) { status('Could not save the link (' + sizeKb + ' KB): ' + e.message, true); }
+  } catch (e) { status('Could not save the link: ' + e.message, true); }
 };
 
 // Opens a shared prototype when the page is loaded with ?p=<id>.
 async function openShared() {
-  const shareId = new URLSearchParams(location.search).get('p');
-  if (!shareId) return;
-  const existing = db.prototypes.find(x => x.shareId === shareId);
+  const projectId = new URLSearchParams(location.search).get('p');
+  if (!projectId) return;
+  const existing = db.prototypes.find(x => x.shareId === projectId);
   if (existing) { openProto(existing.id); return; }
-  const s = settings();
-  if (!s.triggerUrl) { openSettings(); status('Add the trigger URL in Settings to open a shared link.', true); return; }
   status('Opening shared prototype…');
   try {
-    const { data } = await post(s.triggerUrl, s.token, { mode: 'get-project', projectId: shareId });
-    if (!data.project) throw new Error(data.error || 'not found');
-    const p = { ...data.project, id: 'p' + Date.now(), shareId };
+    const read = async (file) => {
+      const res = await fetch(PROJECTS_RAW + projectId + '/' + file + '.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(file + ' not found (' + res.status + ')');
+      return res.json();
+    };
+    const meta = await read('meta');
+    const directions = [];
+    for (let i = 0; i < meta.directionCount; i++) directions.push(await read('direction-' + i));
+    const p = { id: 'p' + Date.now(), shareId: projectId, title: meta.title, brief: meta.brief,
+      directions, lead: 0, prototype: null, comments: [], versions: [] };
     db.prototypes.unshift(p); save(); openProto(p.id); status('Opened shared prototype');
   } catch (e) { status('Could not open that link: ' + e.message, true); }
 }
