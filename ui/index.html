@@ -169,8 +169,50 @@ let lastCallError = '';   // the reason the most recent request failed   // id o
 let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
 let shown = { tab: 'screens', index: 0, dir: null };
 
-function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
-function load() { try { db = JSON.parse(localStorage.getItem(KEY)) || db; } catch (_) {} }
+// The library is kept in IndexedDB. localStorage holds about 5 MB, and a few prototypes with their screen HTML
+// filled it, so the save threw in the middle of a generation. IndexedDB has far more room.
+const DB_NAME = 'wireframe-agent', STORE = 'library';
+function openLibrary() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function libraryPut(value) {
+  const d = await openLibrary();
+  return new Promise((res, rej) => {
+    const tx = d.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(value, KEY);
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+async function libraryGet() {
+  const d = await openLibrary();
+  return new Promise((res, rej) => {
+    const r = d.transaction(STORE).objectStore(STORE).get(KEY);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+// Saves are queued, so a slow write never overlaps another, and a failed write reports itself
+// instead of stopping the generation that called it.
+let writing = Promise.resolve();
+function save() {
+  const snapshot = JSON.stringify(db);
+  writing = writing.then(() => libraryPut(snapshot)).catch(e => status('Could not save: ' + e.message, true));
+}
+async function load() {
+  try {
+    const raw = await libraryGet();
+    if (raw) { db = JSON.parse(raw); return; }
+    // First run on this version: take the library from the old localStorage copy, if there is one.
+    const old = localStorage.getItem(KEY);
+    if (old) { db = JSON.parse(old); save(); }
+  } catch (_) {}
+}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const getProto = (id) => db.prototypes.find(p => p.id === id);
@@ -773,9 +815,7 @@ async function synthesize(p) {
   save(); status('Changes applied'); render();
 }
 
-load();
-render();
-openShared();
+load().then(() => { render(); openShared(); });
 </script>
 </body>
 </html>
