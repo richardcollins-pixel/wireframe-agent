@@ -65,8 +65,6 @@
   .screen .purpose { color: var(--mute); font-size: 13px; line-height: 1.4; }
   .frame { position: relative; background: #fff; border-radius: 22px; border: 1px solid var(--line); overflow: hidden; box-shadow: 0 6px 24px rgb(0 0 0 / .06); }
   .frame iframe { border: 0; display: block; background: #fff; }
-  /* sits over each screen so wheel and drag reach the canvas instead of the screen */
-  .shield { position: absolute; inset: 0; }
   .skel, .skel-bar { background: linear-gradient(90deg, #ececef 0%, #f6f6f8 50%, #ececef 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 8px; }
   .skel-bar { height: 10px; }
   .skel { border-radius: 22px; }
@@ -521,8 +519,15 @@ function renderCanvas(p) {
       <div class="row-screens">${cards}</div>
     </section>`;
   }).join('');
-  const empty = p.directions.length ? '' : `<div class="busy" style="padding:40px">${busy[p.id] ? 'Writing directions…' : 'No directions yet.'}</div>`;
-  $('world').innerHTML = empty + rows;
+  // Until the directions arrive, show the layout as skeletons: three rows of screen placeholders.
+  const pending = !p.directions.length && busy[p.id]
+    ? [0, 1, 2].map(() => `<section class="row">
+        <div class="row-head"><div class="skel-bar" style="width:220px;height:14px"></div><div class="skel-bar" style="width:420px;margin-top:10px"></div></div>
+        <div class="row-screens">${[0, 1, 2, 3].map(() => `<div class="screen" style="width:${size.w}px"><div class="skel" style="width:${size.w}px;height:${size.h}px"></div><div class="skel-bar" style="width:160px;margin-top:4px"></div></div>`).join('')}</div>
+      </section>`).join('')
+    : '';
+  const empty = p.directions.length || busy[p.id] ? '' : `<div class="busy" style="padding:40px">No directions yet.</div>`;
+  $('world').innerHTML = pending + empty + rows;
   $('world').querySelectorAll('[data-retry]').forEach(b => b.onclick = () => retryDirection(p, Number(b.dataset.retry)));
 
   // Fit the canvas to the window the first time a prototype's content appears.
@@ -532,7 +537,7 @@ function renderCanvas(p) {
 
 function screenCard(s, size) {
   const body = s.html
-    ? `<div class="frame" style="width:${size.w}px;height:${size.h}px"><iframe sandbox="allow-scripts" style="width:${size.w}px;height:${size.h}px" srcdoc="${esc(srcdoc(s))}"></iframe><div class="shield"></div></div>`
+    ? `<div class="frame" style="width:${size.w}px;height:${size.h}px"><iframe sandbox="allow-scripts" style="width:${size.w}px;height:${size.h}px" srcdoc="${esc(srcdoc(s))}"></iframe></div>`
     : `<div class="skel" style="width:${size.w}px;height:${size.h}px"></div>`;
   return `<div class="screen" style="width:${size.w}px">
       ${body}
