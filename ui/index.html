@@ -416,15 +416,18 @@ $('shareBtn').onclick = async () => {
   const s = settings();
   if (!s.triggerUrl) { openSettings(); status('Add the trigger URL in Settings first.', true); return; }
   const p = cur();
-  status('Saving link…');
+  // Only the prototype is shared, not its version history: each version holds its own copy of every screen.
+  const { versions, view, shareId, ...shared } = p;
+  const sizeKb = Math.round(JSON.stringify(shared).length / 1024);
+  status('Saving link… (' + sizeKb + ' KB)');
   try {
-    const { data } = await post(s.triggerUrl, s.token, { mode: 'save-project', projectId: p.shareId || '', project: p });
+    const { data } = await post(s.triggerUrl, s.token, { mode: 'save-project', projectId: shareId || '', project: shared });
     if (!data.projectId) throw new Error(data.error || 'no link came back');
     p.shareId = data.projectId; save();
     const url = location.origin + location.pathname + '?p=' + p.shareId;
     await navigator.clipboard.writeText(url).catch(() => {});
     status('Link copied: ' + url);
-  } catch (e) { status('Could not save the link: ' + e.message, true); }
+  } catch (e) { status('Could not save the link (' + sizeKb + ' KB): ' + e.message, true); }
 };
 
 // Opens a shared prototype when the page is loaded with ?p=<id>.
