@@ -435,8 +435,7 @@ $('shareBtn').onclick = async () => {
 async function openShared() {
   const projectId = new URLSearchParams(location.search).get('p');
   if (!projectId) return;
-  const existing = db.prototypes.find(x => x.shareId === projectId);
-  if (existing) { openProto(existing.id); return; }
+  // Always fetch the saved project, so a link shows the latest version rather than an old local copy.
   status('Opening shared prototype…');
   try {
     const read = async (file) => {
@@ -453,6 +452,7 @@ async function openShared() {
       directions.push({ name: m.name, description: m.description, device: m.device, failed: m.failed, error: m.error, screens });
     }
     const p = { id: 'p' + Date.now(), shareId: projectId, title: meta.title, brief: meta.brief, directions };
+    db.prototypes = db.prototypes.filter(x => x.shareId !== projectId);
     db.prototypes.unshift(p); save(); openProto(p.id); status('Opened shared prototype');
   } catch (e) { status('Could not open that link: ' + e.message, true); }
 }
