@@ -115,6 +115,8 @@
     <input id="setUrl" placeholder="https://….m.pipedream.net">
     <label for="setToken">Token (only if the trigger requires one)</label>
     <input id="setToken" type="password" placeholder="Optional">
+    <label for="setSaveUrl">Save flow URL (used by Share)</label>
+    <input id="setSaveUrl" placeholder="https://….m.pipedream.net">
     <div class="foot"><button class="dark" id="setSave">Save</button></div>
     <div class="err">Saved in this browser only. Nothing is stored in the repo.</div>
   </div>
@@ -368,12 +370,15 @@ function openSettings() {
   const s = settings();
   $('setUrl').value = s.triggerUrl || '';
   $('setToken').value = s.token || '';
+  $('setSaveUrl').value = s.saveUrl || '';
   $('setScrim').classList.add('open');
 }
 $('settingsBtn').onclick = openSettings;
 $('setClose').onclick = () => $('setScrim').classList.remove('open');
 $('setSave').onclick = () => {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ triggerUrl: $('setUrl').value.trim(), token: $('setToken').value.trim() }));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+    triggerUrl: $('setUrl').value.trim(), token: $('setToken').value.trim(), saveUrl: $('setSaveUrl').value.trim(),
+  }));
   $('setScrim').classList.remove('open');
   status('Settings saved');
 };
@@ -387,7 +392,7 @@ const newProjectId = () => 'proj_' + Date.now().toString(36) + Math.random().toS
 
 // Sends one file of a project to the flow. Files go one at a time, so a failure names the file.
 async function savePart(s, projectId, file, data) {
-  const { data: res } = await post(s.triggerUrl, s.token, { mode: 'save-project-part', projectId, file, data });
+  const { data: res } = await post(s.saveUrl, s.token, { mode: 'save-project-part', projectId, file, data });
   if (!res.saved) throw new Error((res.error || 'no confirmation') + ' (' + file + ')');
 }
 
@@ -395,7 +400,7 @@ async function savePart(s, projectId, file, data) {
 // One screen per request keeps every request small enough to send.
 async function saveProject(p) {
   const s = settings();
-  if (!s.triggerUrl) { openSettings(); throw new Error('add the trigger URL in Settings first'); }
+  if (!s.saveUrl) { openSettings(); throw new Error('add the save flow URL in Settings first'); }
   const projectId = p.shareId || newProjectId();
   const dirs = p.directions || [];
   const meta = {
