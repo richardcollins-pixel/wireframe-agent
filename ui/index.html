@@ -59,7 +59,7 @@
   .row-head { max-width: 900px; margin-bottom: 22px; }
   .row-head h3 { font-size: 18px; margin: 0 0 6px; font-weight: 600; }
   .row-head p { margin: 0; color: var(--mute); font-size: 13px; line-height: 1.45; }
-  .row-screens { display: grid; grid-template-columns: repeat(4, max-content); gap: 56px; align-items: start; }
+  .row-screens { display: grid; grid-template-columns: repeat(3, max-content); gap: 56px; align-items: start; }
   .screen { display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
   .screen .label { font-weight: 600; font-size: 14px; }
   .screen .purpose { color: var(--mute); font-size: 13px; line-height: 1.4; }
@@ -439,7 +439,7 @@ async function openShared() {
   status('Opening shared prototype…');
   try {
     const read = async (file) => {
-      const res = await fetch(PROJECTS_RAW + projectId + '/' + file + '.json', { cache: 'no-store' });
+      const res = await fetch(PROJECTS_RAW + projectId + '/' + file + '.json?t=' + Date.now(), { cache: 'no-store' });
       if (!res.ok) throw new Error(file + ' not found (' + res.status + ')');
       return res.json();
     };
