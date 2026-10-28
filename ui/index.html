@@ -385,25 +385,32 @@ $('setSave').onclick = () => {
 const PROJECTS_RAW = 'https://raw.githubusercontent.com/richardcollins-pixel/wireframe-projects/main/projects/';
 const newProjectId = () => 'proj_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-// Sends one part of a project to the flow. Parts go one at a time, so a failure names the part.
-async function savePart(s, projectId, part, index, data) {
-  const { data: res } = await post(s.triggerUrl, s.token, { mode: 'save-project-part', projectId, part, index, data });
-  if (!res.saved) throw new Error((res.error || 'no confirmation') + ' (' + part + (index != null ? ' ' + (index + 1) : '') + ')');
+// Sends one file of a project to the flow. Files go one at a time, so a failure names the file.
+async function savePart(s, projectId, file, data) {
+  const { data: res } = await post(s.triggerUrl, s.token, { mode: 'save-project-part', projectId, file, data });
+  if (!res.saved) throw new Error((res.error || 'no confirmation') + ' (' + file + ')');
 }
 
-// Saves the whole open prototype, meta first, then each direction.
+// Saves the whole open prototype: meta.json, then one file per screen (d<direction>-s<screen>.json).
+// One screen per request keeps every request small enough to send.
 async function saveProject(p) {
   const s = settings();
   if (!s.triggerUrl) { openSettings(); throw new Error('add the trigger URL in Settings first'); }
   const projectId = p.shareId || newProjectId();
   const dirs = p.directions || [];
-  const total = dirs.length + 1;
-  const meta = { title: p.title || '', brief: p.brief || {}, directionCount: dirs.length, savedAt: new Date().toISOString() };
-  status('Saving 1 of ' + total + '…');
-  await savePart(s, projectId, 'meta', null, meta);
-  for (let i = 0; i < dirs.length; i++) {
-    status('Saving ' + (i + 2) + ' of ' + total + '…');
-    await savePart(s, projectId, 'direction', i, dirs[i]);
+  const meta = {
+    title: p.title || '', brief: p.brief || {}, savedAt: new Date().toISOString(),
+    directions: dirs.map(d => ({
+      name: d.name || '', description: d.description || '', device: d.device || '',
+      failed: !!d.failed, error: d.error || '', screenCount: (d.screens || []).length,
+    })),
+  };
+  const files = [['meta.json', meta]];
+  dirs.forEach((d, i) => (d.screens || []).forEach((scr, j) => files.push(['d' + i + '-s' + j + '.json', scr])));
+  for (let k = 0; k < files.length; k++) {
+    const [file, data] = files[k];
+    status('Saving ' + (k + 1) + ' of ' + files.length + ' (' + Math.round(JSON.stringify(data).length / 1024) + ' KB)…');
+    await savePart(s, projectId, file, data);
   }
   p.shareId = projectId; save();
   return projectId;
@@ -434,7 +441,12 @@ async function openShared() {
     };
     const meta = await read('meta');
     const directions = [];
-    for (let i = 0; i < meta.directionCount; i++) directions.push(await read('direction-' + i));
+    for (let i = 0; i < meta.directions.length; i++) {
+      const m = meta.directions[i];
+      const screens = [];
+      for (let j = 0; j < m.screenCount; j++) screens.push(await read('d' + i + '-s' + j));
+      directions.push({ name: m.name, description: m.description, device: m.device, failed: m.failed, error: m.error, screens });
+    }
     const p = { id: 'p' + Date.now(), shareId: projectId, title: meta.title, brief: meta.brief, directions };
     db.prototypes.unshift(p); save(); openProto(p.id); status('Opened shared prototype');
   } catch (e) { status('Could not open that link: ' + e.message, true); }
