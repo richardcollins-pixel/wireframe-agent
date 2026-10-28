@@ -113,6 +113,7 @@
   <div class="brand" id="brand">tds <span>Proto</span>Studio</div>
   <div id="projectBar" style="display:none;align-items:center;gap:8px">
     <input id="projName" style="width:320px;font-weight:600" aria-label="Project name">
+    <button id="shareBtn" title="Copy a link others can open">Share</button>
     <button id="projDelete" title="Delete project" aria-label="Delete project" style="padding:7px 10px;display:flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
   </div>
   <div class="status" id="status"></div>
@@ -147,6 +148,8 @@
     <input id="mSpec" placeholder="Confluence link">
     <label for="mText">…or paste the brief</label>
     <textarea id="mText" rows="3" placeholder="Brief text (used when there's no link)" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical"></textarea>
+    <label for="mDevice">Device</label>
+    <select id="mDevice"><option value="mobile">Mobile (390 × 874)</option><option value="desktop">Desktop (1280 × 800)</option></select>
     <div class="foot"><button class="dark" id="mGo">Generate Design Directions</button></div>
     <div class="err" id="mErr"></div>
   </div>
@@ -164,7 +167,7 @@ let busy = {};
 let synthesizing = null;
 let lastCallError = '';   // the reason the most recent request failed   // id of the prototype being synthesized, if any               // id -> true while a generation runs
 let target = null;           // { level, screenId, screenName, directionName, elementId, elementTag, elementText }
-let shown = { tab: 'screens', index: 0, device: 'auto', dir: null };
+let shown = { tab: 'screens', index: 0, dir: null };
 
 function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
 function load() { try { db = JSON.parse(localStorage.getItem(KEY)) || db; } catch (_) {} }
@@ -203,7 +206,7 @@ $('close').onclick = closeModal;
 $('scrim').onclick = (e) => { if (e.target === $('scrim')) closeModal(); };
 
 $('mGo').onclick = async () => {
-  const brief = { briefUrl: $('mSpec').value.trim(), briefContent: $('mText').value.trim() };
+  const brief = { briefUrl: $('mSpec').value.trim(), briefContent: $('mText').value.trim(), device: $('mDevice').value };
   if (!brief.briefUrl && !brief.briefContent) { $('mErr').textContent = 'Add a spec sheet link or paste the brief.'; return; }
   const p = { id: 'p' + Date.now(), title: '', brief, directions: [], lead: 0, prototype: null, comments: [], versions: [] };
   db.prototypes.unshift(p); save();
@@ -215,12 +218,10 @@ $('mGo').onclick = async () => {
   const data = await call({ mode: 'directions', ...brief }, 'Writing directions');
   if (!data) { busy[p.id] = false; render(); return; }
   p.title = data.title || 'Untitled prototype';
+  // The device is chosen up front, so every direction uses it. The content designer's device is ignored.
   p.directions = (data.directions || []).map(d => ({
-    ...d, name: d.title || d.name || '', screens: (d.screens || []).map(withName),
+    ...d, name: d.title || d.name || '', device: brief.device, screens: (d.screens || []).map(withName),
   }));
-  // The content designer chooses each direction's device. If they agree, the view follows them.
-  const devices = [...new Set(p.directions.map(d => d.device).filter(Boolean))];
-  if (devices.length === 1) shown.device = devices[0];
   save(); status('Designing screens'); render();
 
   // 2. The wireframe designer designs each direction as its own request, so screens fill in as each one finishes.
@@ -365,13 +366,48 @@ $('setSave').onclick = () => {
   status('Settings saved');
 };
 
+// ── sharing ──────────────────────────────────────────────────────────────────
+// Share saves the open prototype to the flow's data store and copies a link with ?p=<id>.
+// Opening that link loads the prototype from the flow. Each share overwrites the same saved copy.
+$('shareBtn').onclick = async () => {
+  const s = settings();
+  if (!s.triggerUrl) { openSettings(); status('Add the trigger URL in Settings first.', true); return; }
+  const p = cur();
+  status('Saving link…');
+  try {
+    const { data } = await post(s.triggerUrl, s.token, { mode: 'save-project', projectId: p.shareId || '', project: p });
+    if (!data.projectId) throw new Error(data.error || 'no link came back');
+    p.shareId = data.projectId; save();
+    const url = location.origin + location.pathname + '?p=' + p.shareId;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    status('Link copied: ' + url);
+  } catch (e) { status('Could not save the link: ' + e.message, true); }
+};
+
+// Opens a shared prototype when the page is loaded with ?p=<id>.
+async function openShared() {
+  const shareId = new URLSearchParams(location.search).get('p');
+  if (!shareId) return;
+  const existing = db.prototypes.find(x => x.shareId === shareId);
+  if (existing) { openProto(existing.id); return; }
+  const s = settings();
+  if (!s.triggerUrl) { openSettings(); status('Add the trigger URL in Settings to open a shared link.', true); return; }
+  status('Opening shared prototype…');
+  try {
+    const { data } = await post(s.triggerUrl, s.token, { mode: 'get-project', projectId: shareId });
+    if (!data.project) throw new Error(data.error || 'not found');
+    const p = { ...data.project, id: 'p' + Date.now(), shareId };
+    db.prototypes.unshift(p); save(); openProto(p.id); status('Opened shared prototype');
+  } catch (e) { status('Could not open that link: ' + e.message, true); }
+}
+
 // ── workspace ────────────────────────────────────────────────────────────────
 function openProto(id) {
   current = id;
   const p = cur();
   if (!p.view) p.view = {};
   target = null;
-  shown = { tab: 'screens', index: 0, device: 'auto', dir: null };
+  shown = { tab: 'screens', index: 0, dir: null };
   render();
 }
 
@@ -469,12 +505,12 @@ function skeletonDirection(dev) {
 }
 
 function renderCenter(p) {
-  const forced = shown.device === 'mobile' || shown.device === 'desktop' ? shown.device : null;
-  const dev = forced || 'mobile';
+  // The device chosen when the prototype was started. Older prototypes without one show mobile.
+  const forced = p.brief?.device === 'desktop' ? 'desktop' : 'mobile';
+  const dev = forced;
   const size = SIZES[dev];
   const toolbar = `<div class="toolbar">
-      <select id="device"><option value="auto" ${!forced ? 'selected' : ''}>Auto</option><option value="mobile" ${forced === 'mobile' ? 'selected' : ''}>Mobile</option><option value="desktop" ${forced === 'desktop' ? 'selected' : ''}>Desktop</option></select>
-      <span class="size">${forced ? size.w + ' × ' + size.h : 'each screen its own size'}</span>
+      <span class="size">${size.label} · ${size.w} × ${size.h}</span>
       <div class="tabs"><button data-tab="screens" class="${shown.tab === 'screens' ? 'on' : ''}">Screens</button><button data-tab="prototype" class="${shown.tab === 'prototype' ? 'on' : ''}">Prototype</button></div>
     </div>`;
 
@@ -515,7 +551,6 @@ function renderCenter(p) {
     }
   }
   $('center').innerHTML = toolbar + `<div class="stage">${body}</div>`;
-  $('device').onchange = (e) => { shown.device = e.target.value; render(); };
   $('center').querySelectorAll('[data-retry]').forEach(b => b.onclick = () => retryDirection(p, Number(b.dataset.retry)));
   $('center').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shown.tab = b.dataset.tab; render(); });
   const prev = $('center').querySelector('[data-prev]'), next = $('center').querySelector('[data-next]');
@@ -577,6 +612,11 @@ function clickScript(screenId) {
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'wa-clear') document.querySelectorAll('.wa-sel').forEach(n => n.classList.remove('wa-sel'));
   });
+<\/script>
+<script type="module">
+  // The blob (T) is drawn by the design system's behaviors/blob.js. The editor loads it when a page has a .blob or .glow;
+  // a screen's iframe loads only the stylesheet, so the blob stayed an empty canvas. Load it the same way, when needed.
+  if (document.querySelector('.blob, .glow')) import('./behaviors/blob.js');
 <\/script>`;
 }
 
@@ -735,6 +775,7 @@ async function synthesize(p) {
 
 load();
 render();
+openShared();
 </script>
 </body>
 </html>
