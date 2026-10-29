@@ -607,7 +607,7 @@ function srcdoc(screen) {
   const head = `<base href="https://richardcollins-pixel.github.io/thoughtful-design-system/tds/">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="${TDS_CSS}">
-<style>html,body{margin:0;overflow-x:hidden}</style>`;
+<style>html,body{margin:0;overflow-x:hidden}html{scrollbar-width:none}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none}</style>`;
   const html = screen.html || '';
   // Charcoal (wireframe) fidelity: accent colours and imagery drop out and gradients flatten, so screens read as wireframes.
   const fidelity = 'data-fidelity="wireframe"';
